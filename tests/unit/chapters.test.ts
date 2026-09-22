@@ -25,6 +25,12 @@ it('no inventa capítulos a partir de menciones en el cuerpo o entradas con punt
   const book = structureBook(make(['En el capítulo I veremos otras ideas.','INTRODUCCIÓN ........ 7','Texto sin estructura clara.']));
   expect(book.chapters).toHaveLength(1); expect(book.chapters?.[0].title).toBe('Texto completo');
 });
+it('reconoce numeración romana y títulos breves al comienzo de página', () => {
+  const book = make(['I', 'Le mythe de Sisyphe', 'Un texto largo que desarrolla el argumento con suficiente extensión para distinguirlo de un encabezado.', 'II', 'Le suicide', 'Otro texto largo que continúa la sección con contenido real y no debe convertirse en título.']);
+  const result = structureBook(book);
+  expect(result.chapters?.map(c => c.title)).toContain('I');
+  expect(result.chapters?.map(c => c.title)).toContain('II');
+});
 it('marca encabezados repetidos y números de página sin quitar contenido único', () => {
   const book = make([]); book.pages=4;
   book.blocks = [1,2,3,4].flatMap(page => [`Weber — Política`,`Contenido único en la página ${page}.`,String(page)].map((text,i) => ({id:`${page}-${i}`,text,page,endPage:page,pageLabel:String(page)})));

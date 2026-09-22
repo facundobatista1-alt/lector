@@ -20,6 +20,10 @@ function QuoteCard({ quote, report }: { quote: Annotation; report: (text: string
     try { await navigator.clipboard.writeText(quoteClipboard(quote, reference)); report('Cita copiada.'); }
     catch { report('El navegador no permitió copiar. Podés seleccionar el texto de la cita y copiarlo manualmente.'); }
   }
+  async function remove() {
+    if (!window.confirm('¿Eliminar esta cita?')) return;
+    try { await db.annotations.delete(quote.id); report('Cita eliminada.'); } catch { report('No se pudo eliminar la cita.'); }
+  }
   return <article className="quote-card" style={{ borderLeftColor: quote.color }}>
     <h2>{quote.title}</h2><p className="quote-meta">{quoteReference(quote)}{quote.chapter ? ` · ${quote.chapter}` : ''}</p>
     <p className="quote-meta">{new Date(quote.createdAt).toLocaleString('es-AR')} · archivo p. {quote.page} · fragmento {quote.segment + 1}, {Math.floor(quote.seconds)} s</p>
@@ -29,7 +33,7 @@ function QuoteCard({ quote, report }: { quote: Annotation; report: (text: string
       <label>Color<input aria-label="Color" type="color" value={color} onChange={e => setColor(e.target.value)}/></label>
       <div className="quote-actions"><button className="primary" disabled={saving || !text.trim()}>Guardar cambios</button><button type="button" disabled={saving} onClick={() => setEditing(false)}>Cancelar</button></div>
     </form> : <><blockquote>{quote.text}</blockquote>{quote.comment && <p className="quote-comment">{quote.comment}</p>}
-      <div className="quote-actions"><button onClick={() => { setText(quote.text); setComment(quote.comment); setColor(quote.color); setEditing(true); }}>Editar cita</button><button onClick={() => void copy(false)}>Copiar texto</button><button onClick={() => void copy(true)}>Copiar con referencia</button></div></>}
+      <div className="quote-actions"><button onClick={() => { setText(quote.text); setComment(quote.comment); setColor(quote.color); setEditing(true); }}>Editar cita</button><button onClick={() => void copy(false)}>Copiar texto</button><button onClick={() => void copy(true)}>Copiar con referencia</button><button className="danger-button" onClick={() => void remove()}>Eliminar</button></div></>}
     <details><summary>Ver párrafo original</summary><p className="quote-context">{quote.context}</p><small>La posición de audio corresponde al fragmento, no al tiempo total del libro. El texto original se conserva aunque edites la cita.</small></details>
   </article>;
 }
