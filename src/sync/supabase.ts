@@ -21,7 +21,7 @@ async function session(): Promise<Session> {
   throw new Error('Iniciá sesión para sincronizar tus libros entre dispositivos.');
 }
 export async function signIn(email: string, password: string) { const response = await request('/auth/v1/token?grant_type=password', { method: 'POST', body: JSON.stringify({ email, password }) }); const value = await response.json() as Session; localStorage.setItem(SESSION_KEY, JSON.stringify(value)); return value; }
-export async function signUp(email: string, password: string) { const response = await request('/auth/v1/signup', { method: 'POST', body: JSON.stringify({ email, password }) }); const value = await response.json() as Session; if (value.access_token) localStorage.setItem(SESSION_KEY, JSON.stringify(value)); return value; }
+export async function signUp(email: string, password: string) { const redirect = typeof window === 'undefined' ? undefined : window.location.origin; const suffix = redirect ? `?redirect_to=${encodeURIComponent(redirect)}` : ''; const response = await request(`/auth/v1/signup${suffix}`, { method: 'POST', body: JSON.stringify({ email, password }) }); const value = await response.json() as Session; if (value.access_token) localStorage.setItem(SESSION_KEY, JSON.stringify(value)); return value; }
 export function signOut() { localStorage.removeItem(SESSION_KEY); }
 async function upsert(path: string, rows: unknown[], token: string) { if (!rows.length) return; await request(path, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) }, token); }
 async function uploadPDF(book: Book, owner: string, token: string) {
