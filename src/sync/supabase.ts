@@ -35,8 +35,9 @@ export async function syncNow(database: LibraryDB = db) {
   if (!supabaseConfigured || !navigator.onLine) return { skipped: true, message: 'Sin conexión o Supabase no configurado.' };
   const auth = await session(); const books = await database.books.toArray(); const positions = await database.positions.toArray(); const annotations = await database.annotations.toArray(); const settings = await database.settings.toArray();
   await upsert('/rest/v1/lumbre_books', books.map(({ file, ...data }) => ({ id: data.id, owner: auth.user.id, data, updated_at: new Date(data.importedAt).toISOString() })), auth.access_token);
-  await upsert('/rest/v1/lumbre_positions', positions.map(data => ({ book_id: data.bookId, owner: auth.user.id, data, updated_at: new Date(data.updatedAt).toISOString() })), auth.access_token);
-  await upsert('/rest/v1/lumbre_annotations', annotations.map(data => ({ id: data.id, book_id: data.bookId, owner: auth.user.id, data, updated_at: new Date(data.updatedAt).toISOString() })), auth.access_token);
+  const bookIds = new Set(books.map(book => book.id));
+  await upsert('/rest/v1/lumbre_positions', positions.filter(data => bookIds.has(data.bookId)).map(data => ({ book_id: data.bookId, owner: auth.user.id, data, updated_at: new Date(data.updatedAt).toISOString() })), auth.access_token);
+  await upsert('/rest/v1/lumbre_annotations', annotations.filter(data => bookIds.has(data.bookId)).map(data => ({ id: data.id, book_id: data.bookId, owner: auth.user.id, data, updated_at: new Date(data.updatedAt).toISOString() })), auth.access_token);
   await upsert('/rest/v1/lumbre_settings', settings.map(data => ({ key: data.key, owner: auth.user.id, data, updated_at: new Date(data.updatedAt).toISOString() })), auth.access_token);
   for (const book of books) await uploadPDF(book, auth.user.id, auth.access_token);
   const remote = await (await request('/rest/v1/lumbre_books?select=id,data,owner,updated_at', {}, auth.access_token)).json() as RemoteBook[];
