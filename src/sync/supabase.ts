@@ -1,4 +1,4 @@
-import type { Annotation, Book, Position } from '../types';
+import type { Book } from '../types';
 import { db, type LibraryDB } from '../storage/db';
 
 const URL = String(import.meta.env.VITE_SUPABASE_URL ?? '').replace(/\/$/, '');
@@ -34,7 +34,7 @@ async function downloadPDF(id: string, owner: string, token: string) {
 export async function syncNow(database: LibraryDB = db) {
   if (!supabaseConfigured || !navigator.onLine) return { skipped: true, message: 'Sin conexión o Supabase no configurado.' };
   const auth = await session(); const books = await database.books.toArray(); const positions = await database.positions.toArray(); const annotations = await database.annotations.toArray(); const settings = await database.settings.toArray();
-  await upsert('/rest/v1/lumbre_books', books.map(({ file, ...data }) => ({ id: data.id, owner: auth.user.id, data, updated_at: new Date(data.importedAt).toISOString() })), auth.access_token);
+  await upsert('/rest/v1/lumbre_books', books.map(book => { const { file, ...data } = book; void file; return { id: data.id, owner: auth.user.id, data, updated_at: new Date(data.importedAt).toISOString() }; }), auth.access_token);
   const bookIds = new Set(books.map(book => book.id));
   await upsert('/rest/v1/lumbre_positions', positions.filter(data => bookIds.has(data.bookId)).map(data => ({ book_id: data.bookId, owner: auth.user.id, data, updated_at: new Date(data.updatedAt).toISOString() })), auth.access_token);
   await upsert('/rest/v1/lumbre_annotations', annotations.filter(data => bookIds.has(data.bookId)).map(data => ({ id: data.id, book_id: data.bookId, owner: auth.user.id, data, updated_at: new Date(data.updatedAt).toISOString() })), auth.access_token);
