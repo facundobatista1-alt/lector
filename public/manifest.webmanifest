@@ -1,0 +1,15 @@
+{
+  "name":"Lumbre · Leer y escuchar",
+  "short_name":"Lumbre",
+  "description":"Biblioteca personal de libros PDF para leer y escuchar con Dora.",
+  "lang":"es",
+  "start_url":"/",
+  "scope":"/",
+  "display":"standalone",
+  "background_color":"#f5f4ef",
+  "theme_color":"#254f41",
+  "icons":[
+    {"src":"/icons/icon-192.png","sizes":"192x192","type":"image/png","purpose":"any maskable"},
+    {"src":"/icons/icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+  ]
+}

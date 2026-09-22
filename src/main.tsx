@@ -1,0 +1,10 @@
+import { createRoot } from 'react-dom/client';
+import App from './App';
+import './style.css';
+import './library/library.css';
+import './annotations/notes.css';
+import './sync/backup.css';
+import './pwa/pwa.css';
+import { registerPWA } from './pwa/register';
+createRoot(document.getElementById('root')!).render(<App />);
+registerPWA();

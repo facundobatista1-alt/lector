@@ -1,0 +1,36 @@
+{
+  "repo": "onnx-community/Kokoro-82M-v1.0-ONNX",
+  "revision": "1939ad2",
+  "files": [
+    {
+      "file": "tokenizer.json",
+      "bytes": 3497,
+      "sha256": "77a02c8e164413299b4b4c403b14f8e0e1c1b727db4d46a09d6327b861060a34"
+    },
+    {
+      "file": "voices/ef_dora.bin",
+      "bytes": 522240,
+      "sha256": "f66ec66bd295acb18372e37008533a9a3228483ccd294e7538d5d9294ac9a532"
+    },
+    {
+      "file": "voices/em_alex.bin",
+      "bytes": 522240,
+      "sha256": "27809e9eafdcbcfff90a3016c697568676531de2a2c39cee29c96c7bd6b83e95"
+    },
+    {
+      "file": "voices/em_santa.bin",
+      "bytes": 522240,
+      "sha256": "ad43b774e1ca24d05c6161297d8aeb770ac3d29bb95daf516727af5f7d543683"
+    },
+    {
+      "file": "onnx/model_quantized.onnx",
+      "bytes": 92361116,
+      "sha256": "fbae9257e1e05ffc727e951ef9b9c98418e6d79f1c9b6b13bd59f5c9028a1478"
+    },
+    {
+      "file": "onnx/model.onnx",
+      "bytes": 325532232,
+      "sha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb"
+    }
+  ]
+}

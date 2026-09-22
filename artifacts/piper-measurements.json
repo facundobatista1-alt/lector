@@ -1,0 +1,72 @@
+[
+  {
+    "voice": "piper_davefx",
+    "requested": "wasm",
+    "actual": "piper-wasm",
+    "threads": 4,
+    "loadMs": 0,
+    "generationMs": 1960.9300000071526,
+    "audioSeconds": 15.905668934240364,
+    "rtf": 0.12328497519433654,
+    "pcmBytes": 1402880,
+    "createdAt": 1789997198010,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0",
+    "id": 5
+  },
+  {
+    "voice": "piper_davefx",
+    "requested": "wasm",
+    "actual": "piper-wasm",
+    "threads": 4,
+    "loadMs": 0,
+    "generationMs": 2009.210000038147,
+    "audioSeconds": 15.104580498866213,
+    "rtf": 0.1330199140710305,
+    "pcmBytes": 1332224,
+    "createdAt": 1789997196029,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0",
+    "id": 4
+  },
+  {
+    "voice": "piper_davefx",
+    "requested": "wasm",
+    "actual": "piper-wasm",
+    "threads": 4,
+    "loadMs": 0,
+    "generationMs": 1897.1200000047684,
+    "audioSeconds": 14.918820861678004,
+    "rtf": 0.12716286478631184,
+    "pcmBytes": 1315840,
+    "createdAt": 1789997194000,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0",
+    "id": 3
+  },
+  {
+    "voice": "piper_davefx",
+    "requested": "wasm",
+    "actual": "piper-wasm",
+    "threads": 4,
+    "loadMs": 0,
+    "generationMs": 2392.1650000214577,
+    "audioSeconds": 16.637097505668933,
+    "rtf": 0.14378499610321754,
+    "pcmBytes": 1467392,
+    "createdAt": 1789997192082,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0",
+    "id": 2
+  },
+  {
+    "voice": "piper_davefx",
+    "requested": "wasm",
+    "actual": "piper-wasm",
+    "threads": 4,
+    "loadMs": 4785.045000016689,
+    "generationMs": 4015.6299999952316,
+    "audioSeconds": 12.921904761904761,
+    "rtf": 0.3107614607897254,
+    "pcmBytes": 1139712,
+    "createdAt": 1789997189661,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0",
+    "id": 1
+  }
+]

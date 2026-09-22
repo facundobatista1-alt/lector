@@ -1,0 +1,78 @@
+{
+  "groups": {
+    "ef_dora/webgpu": {
+      "samples": 5,
+      "generationSeconds": 108.06395500004292,
+      "audioSeconds": 74.775,
+      "loadSeconds": 20.243899999976158,
+      "threads": 4,
+      "jsMemoryAvailable": false,
+      "weightedRTF": 1.4451882982285913
+    },
+    "em_santa/wasm": {
+      "samples": 5,
+      "generationSeconds": 122.91509500002861,
+      "audioSeconds": 75.9,
+      "loadSeconds": 0.0214449999332428,
+      "threads": 4,
+      "jsMemoryAvailable": false,
+      "weightedRTF": 1.6194347167329197
+    },
+    "em_alex/wasm": {
+      "samples": 5,
+      "generationSeconds": 127.87458500003814,
+      "audioSeconds": 75.5,
+      "loadSeconds": 0.0310900000333786,
+      "threads": 4,
+      "jsMemoryAvailable": false,
+      "weightedRTF": 1.6937031125832867
+    },
+    "ef_dora/wasm": {
+      "samples": 5,
+      "generationSeconds": 127.02737499999999,
+      "audioSeconds": 74.7,
+      "loadSeconds": 5.043510000050068,
+      "threads": 4,
+      "jsMemoryAvailable": false,
+      "weightedRTF": 1.7005003346720213
+    }
+  },
+  "waveforms": [
+    {
+      "file": "ef_dora-wasm.wav",
+      "seconds": 13.4,
+      "sampleRate": 24000,
+      "rms": 0.06314856473234973,
+      "peak": 0.769073486328125,
+      "clippingFraction": 0,
+      "note": "Señal no nula no demuestra naturalidad ni pronunciación correcta."
+    },
+    {
+      "file": "ef_dora-webgpu.wav",
+      "seconds": 13.525,
+      "sampleRate": 24000,
+      "rms": 0.0658722574430825,
+      "peak": 0.85443115234375,
+      "clippingFraction": 0,
+      "note": "Señal no nula no demuestra naturalidad ni pronunciación correcta."
+    },
+    {
+      "file": "em_alex-wasm.wav",
+      "seconds": 13.3,
+      "sampleRate": 24000,
+      "rms": 0.06804060480323991,
+      "peak": 0.577667236328125,
+      "clippingFraction": 0,
+      "note": "Señal no nula no demuestra naturalidad ni pronunciación correcta."
+    },
+    {
+      "file": "em_santa-wasm.wav",
+      "seconds": 13.475,
+      "sampleRate": 24000,
+      "rms": 0.06964435640993061,
+      "peak": 0.7996826171875,
+      "clippingFraction": 0,
+      "note": "Señal no nula no demuestra naturalidad ni pronunciación correcta."
+    }
+  ]
+}

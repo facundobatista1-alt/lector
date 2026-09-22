@@ -1,0 +1,56 @@
+import { expect, test } from '@playwright/test';
+import { samplePDF } from '../fixture';
+test('PDF real, audio neuronal, pausa, selección, cierre y restauración', async ({ page, context }) => {
+  const remoteRequests: string[] = [];
+  await context.route('**/*', route => { const url = new URL(route.request().url()); if (!['127.0.0.1','localhost'].includes(url.hostname)) { remoteRequests.push(url.origin); return route.abort(); } return route.continue(); });
+  const errors: string[] = []; page.on('pageerror', e => errors.push(e.message));
+  await page.goto('/');
+  await page.getByRole('button', {name:/Biblioteca/}).click();
+  await page.getByLabel('Agregar PDF').setInputFiles({ name:'prueba.pdf',mimeType:'application/pdf',buffer:samplePDF() });
+  await expect(page.getByRole('heading', {name:'Libro de prueba'})).toBeVisible();
+  await expect(page.getByText('Autora de prueba')).toBeVisible();
+  await expect(page.getByText('Página i · archivo 1').first()).toBeVisible();
+  await page.getByRole('button',{name:'Seleccionar párrafo 2',exact:true}).click();
+  await expect.poll(async () => {
+    const alert = page.getByRole('alert');
+    if (await alert.count()) throw new Error(await alert.innerText());
+    return page.locator('audio').evaluate((a: HTMLAudioElement) => !!a.getAttribute('src'));
+  }, {timeout:180000}).toBe(true);
+  await page.getByRole('button',{name:'Escuchar',exact:true}).click();
+  await expect(page.locator('.paragraph.speaking')).toContainText('La libertad exige pensar');
+  await expect.poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => a.currentTime), { timeout:90000 }).toBeGreaterThan(1);
+  await page.getByRole('button',{name:'Pausar',exact:true}).click();
+  await page.getByLabel('Velocidad',{exact:true}).selectOption('1.25');
+  const pausedAt = await page.locator('audio').evaluate((a: HTMLAudioElement) => a.currentTime);
+  await expect(page.locator('.status .working')).toHaveCount(0,{timeout:90000});
+  await page.getByRole('button',{name:'Resultados',exact:false}).click();
+  const generatedCount = await page.locator('tbody tr').count();
+  await page.close();
+  const resumed = await context.newPage(); await resumed.goto('/');
+  await resumed.getByRole('button',{name:'Lector'}).click();
+  await expect(resumed.getByRole('button',{name:'Seleccionar párrafo 2',exact:true})).toHaveAttribute('aria-current','true');
+  await expect.poll(() => resumed.locator('audio').evaluate((a: HTMLAudioElement) => a.readyState)).toBeGreaterThan(0);
+  await expect.poll(() => resumed.locator('audio').evaluate((a: HTMLAudioElement) => a.currentTime)).toBeGreaterThan(pausedAt - .3);
+  // The cache survives closing the page; no second synthesis was needed.
+  await resumed.getByRole('button',{name:'Resultados',exact:false}).click();
+  await expect(resumed.locator('tbody tr')).toHaveCount(generatedCount);
+  await resumed.getByRole('button',{name:'Lector'}).click();
+  await resumed.getByRole('button',{name:'Seleccionar párrafo 3',exact:true}).click();
+  await expect(resumed.getByRole('button',{name:'Seleccionar párrafo 3',exact:true})).toHaveAttribute('aria-current','true');
+  await resumed.close();
+  const restored = await context.newPage(); await restored.goto('/');
+  await restored.getByRole('button',{name:'Lector'}).click();
+  await expect(restored.getByRole('heading',{name:'Libro de prueba'})).toBeVisible();
+  await expect(restored.getByRole('button',{name:'Seleccionar párrafo 3',exact:true})).toHaveAttribute('aria-current','true');
+  await expect(restored.getByLabel('Velocidad',{exact:true})).toHaveValue('1.25');
+  await restored.screenshot({path:`artifacts/${test.info().project.name}-desktop.png`,fullPage:true});
+  await restored.setViewportSize({width:390,height:844}); await restored.screenshot({path:`artifacts/${test.info().project.name}-mobile-layout.png`,fullPage:true});
+  expect(await restored.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(errors).toEqual([]);
+  expect(remoteRequests).toEqual([]);
+});
+test('rechaza archivo inválido sin crear libro', async ({page}) => {
+  await page.goto('/'); await page.getByRole('button',{name:/Biblioteca/}).click();
+  await page.getByLabel('Agregar PDF').setInputFiles({ name:'falso.pdf',mimeType:'application/pdf',buffer:Buffer.from('not a pdf') });
+  await expect(page.getByRole('alert')).toContainText('cabecera PDF');
+});

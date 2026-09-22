@@ -1,0 +1,32 @@
+[
+  {
+    "voice": "ef_dora",
+    "requested": "webgpu",
+    "actual": "webgpu",
+    "threads": 4,
+    "loadMs": 17508.759999990463,
+    "generationMs": 13688.439999997616,
+    "audioSeconds": 7.875,
+    "rtf": 1.7382146031743004,
+    "pcmBytes": 756000,
+    "createdAt": 1790001249192,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0",
+    "notes": "dora-calibration-v1",
+    "id": 2
+  },
+  {
+    "voice": "ef_dora",
+    "requested": "wasm",
+    "actual": "wasm",
+    "threads": 4,
+    "loadMs": 4797.115000009537,
+    "generationMs": 14048.514999985695,
+    "audioSeconds": 7.85,
+    "rtf": 1.7896197452211078,
+    "pcmBytes": 753600,
+    "createdAt": 1790001217971,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0",
+    "notes": "dora-calibration-v1",
+    "id": 1
+  }
+]

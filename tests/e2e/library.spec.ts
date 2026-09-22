@@ -1,0 +1,62 @@
+import { expect, test } from '@playwright/test';
+import { chapterPDF, samplePDF } from '../fixture';
+
+test('biblioteca, capítulos de PDF, continuar con un toque y conservar progreso', async ({page,context}) => {
+  await context.route('**/*',route => ['localhost','127.0.0.1'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
+  await page.goto('/');
+  await expect(page.getByRole('heading',{name:'Mi biblioteca',exact:true})).toBeVisible();
+  await page.getByLabel('Agregar PDF').setInputFiles({name:'capitulos.pdf',mimeType:'application/pdf',buffer:chapterPDF()});
+  await expect(page.getByRole('heading',{name:'Ensayos de prueba',exact:true})).toBeVisible();
+  const chapters = page.getByRole('navigation',{name:'Capítulos',exact:true});
+  await expect(chapters.getByRole('button')).toHaveCount(4);
+  await expect(chapters.getByRole('button',{name:/Libertad/})).toHaveAttribute('aria-current','location');
+  await expect(page.getByLabel('Incluir índice y bibliografía en el audio')).not.toBeChecked();
+  await chapters.getByRole('button',{name:/Historia/}).click();
+  await expect(chapters.getByRole('button',{name:/Historia/})).toHaveAttribute('aria-current','location');
+  await page.getByRole('button',{name:/Biblioteca/}).click();
+  const continuation = page.locator('.continue-card');
+  await expect(continuation).toContainText('Historia');
+  await expect(page.getByRole('button',{name:'Abrir Ensayos de prueba',exact:true})).toBeVisible();
+  await page.getByLabel('Buscar libros').fill('NO EXISTE');
+  await expect(page.locator('.book-grid .book-card')).toHaveCount(0);
+  await page.getByLabel('Buscar libros').fill('autora');
+  await expect(page.locator('.book-grid .book-card')).toHaveCount(1);
+  await page.getByLabel('Ordenar por').selectOption('title');
+  await page.screenshot({path:`artifacts/${test.info().project.name}-library.png`,fullPage:true});
+  await page.reload();
+  await expect(page.getByRole('heading',{name:'Mi biblioteca',exact:true})).toBeVisible();
+  await expect(continuation).toContainText('Historia');
+  // Single button restores and starts real Dora audio after the existing reserve gate.
+  await page.getByRole('button',{name:'Continuar escuchando',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Ensayos de prueba',exact:true})).toBeVisible();
+  await expect.poll(() => page.locator('audio').evaluate((a:HTMLAudioElement) => a.currentTime),{timeout:120000}).toBeGreaterThan(.1);
+  await page.getByRole('button',{name:'Pausar',exact:true}).click();
+  await expect(chapters.getByRole('button',{name:/Historia/})).toHaveAttribute('aria-current','location');
+  await page.getByLabel('Incluir índice y bibliografía en el audio').check();
+  await chapters.getByRole('button',{name:/Bibliografia/}).click();
+  await expect(chapters.getByRole('button',{name:/Bibliografia/})).toHaveAttribute('aria-current','location');
+  await page.reload();
+  await page.getByRole('button',{name:'Lector'}).click();
+  await expect(page.getByLabel('Incluir índice y bibliografía en el audio')).toBeChecked();
+  await expect(chapters.getByRole('button',{name:/Bibliografia/})).toHaveAttribute('aria-current','location');
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:`artifacts/${test.info().project.name}-chapters-mobile.png`,fullPage:true});
+  expect(await page.evaluate(() => document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
+test('dos libros mantienen posiciones independientes y el último es el que continúa', async ({page}) => {
+  await page.goto('/');
+  await page.getByLabel('Agregar PDF').setInputFiles({name:'uno.pdf',mimeType:'application/pdf',buffer:samplePDF()});
+  await page.getByRole('button',{name:'Seleccionar párrafo 2',exact:true}).click();
+  await page.getByRole('button',{name:/Biblioteca/}).click();
+  await page.getByLabel('Agregar PDF').setInputFiles({name:'dos.pdf',mimeType:'application/pdf',buffer:chapterPDF('Otro libro')});
+  await page.getByRole('navigation',{name:'Capítulos',exact:true}).getByRole('button',{name:/Historia/}).click();
+  await page.getByRole('button',{name:/Biblioteca/}).click();
+  await expect(page.locator('.continue-card')).toContainText('Otro libro');
+  await page.getByRole('button',{name:'Abrir Libro de prueba',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Seleccionar párrafo 2',exact:true})).toHaveAttribute('aria-current','true');
+  await page.getByRole('button',{name:/Biblioteca/}).click();
+  await expect(page.locator('.continue-card')).toContainText('Libro de prueba');
+  await expect(page.locator('.book-grid .book-card')).toHaveCount(2);
+});

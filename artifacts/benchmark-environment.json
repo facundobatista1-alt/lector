@@ -1,0 +1,44 @@
+{
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0",
+    "cores": 12,
+    "deviceMemory": 8,
+    "isolated": true,
+    "webgpu": true,
+    "adapter": {
+      "vendor": "intel",
+      "architecture": "gen-12lp",
+      "device": "",
+      "description": ""
+    },
+    "host": {
+      "cpu": "12th Gen Intel(R) Core(TM) i5-12450H",
+      "ramGiB": 7.675926208496094
+    }
+  },
+  "reports": [
+    {
+      "voice": "ef_dora",
+      "engine": "wasm",
+      "complete": true
+    },
+    {
+      "voice": "em_alex",
+      "engine": "wasm",
+      "complete": true
+    },
+    {
+      "voice": "em_santa",
+      "engine": "wasm",
+      "complete": true
+    },
+    {
+      "voice": "ef_dora",
+      "engine": "webgpu",
+      "complete": true
+    }
+  ],
+  "recordedAt": "2026-09-21T13:01:09.995Z",
+  "physicalMobile": false,
+  "humanListening": "pending"
+}

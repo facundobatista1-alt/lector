@@ -1,0 +1,55 @@
+import { test, expect } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import { samplePDF } from '../fixture';
+
+test('respaldo transfiere texto, posición y citas; PDF se adjunta sin duplicar',async({page,browser})=>{
+  await page.goto('/');
+  await expect(page.getByLabel('Agregar PDF')).toBeEnabled();
+  await page.getByLabel('Agregar PDF').setInputFiles({name:'libro.pdf',mimeType:'application/pdf',buffer:samplePDF()});
+  await page.getByRole('button',{name:'Seleccionar párrafo 2',exact:true}).click();
+  await page.getByLabel('Velocidad',{exact:true}).selectOption('1.25');
+  await page.getByLabel('Seguir párrafo',{exact:true}).uncheck();
+  await page.getByRole('button',{name:/Tema oscuro/}).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+  await page.getByRole('button',{name:'Guardar cita',exact:true}).click();
+  await expect(page.getByText('Cita guardada en «Citas y notas».')).toBeVisible();
+  await page.getByRole('button',{name:/Biblioteca/}).click();
+  await page.getByText('Respaldo y transferencia',{exact:true}).click();
+  const download=page.waitForEvent('download');await page.getByRole('button',{name:'Exportar respaldo',exact:true}).click();
+  const data=await readFile((await (await download).path())!);
+  expect(JSON.parse(data.toString()).books[0].pdf).toBeUndefined();
+  await page.getByLabel('Incluir PDFs originales').check();
+  const fullDownload=page.waitForEvent('download');await page.getByRole('button',{name:'Exportar respaldo',exact:true}).click();
+  const full=JSON.parse((await readFile((await (await fullDownload).path())!)).toString());
+  expect(Buffer.from(full.books[0].pdf,'base64')).toEqual(samplePDF());
+  const targetContext=await browser.newContext();const target=await targetContext.newPage();
+  try {
+    await target.goto('http://127.0.0.1:4173/');
+    await target.getByText('Respaldo y transferencia',{exact:true}).click();
+    await expect(target.getByLabel('Seleccionar respaldo')).toBeEnabled();
+    await target.getByLabel('Seleccionar respaldo').setInputFiles({name:'respaldo.json',mimeType:'application/json',buffer:data});
+    await target.getByRole('button',{name:'Importar este respaldo',exact:true}).click();
+    await expect(target.getByText(/Respaldo importado: 1 libros/)).toBeVisible();
+    await target.getByRole('button',{name:'Abrir Libro de prueba',exact:true}).click();
+    await expect(target.getByRole('button',{name:'Seleccionar párrafo 2',exact:true})).toHaveAttribute('aria-current','true');
+    await expect(target.getByLabel('Velocidad',{exact:true})).toHaveValue('1.25');
+    await expect(target.getByLabel('Seguir párrafo',{exact:true})).not.toBeChecked();
+    await expect(target.locator('html')).toHaveAttribute('data-theme','dark');
+    await expect(target.getByText(/Texto restaurado sin PDF original/)).toBeVisible();
+    await target.getByRole('button',{name:'Citas y notas',exact:true}).click();
+    await expect(target.locator('.quote-card')).toHaveCount(1);
+    await target.getByRole('button',{name:/Biblioteca/}).click();
+    await target.getByLabel('Agregar PDF').setInputFiles({name:'mismo.pdf',mimeType:'application/pdf',buffer:samplePDF()});
+    await expect(target.getByRole('heading',{name:'Libro de prueba',exact:true})).toBeVisible();
+    await expect(target.getByText(/Texto restaurado sin PDF original/)).toHaveCount(0);
+    await target.reload();
+    await expect(target.locator('.book-grid .book-card')).toHaveCount(1);
+    await target.getByText('Respaldo y transferencia',{exact:true}).click();
+    await target.getByLabel('Seleccionar respaldo').setInputFiles({name:'roto.json',mimeType:'application/json',buffer:Buffer.from('{"format":"incorrecto"}')});
+    await expect(target.getByRole('alert')).toContainText('inválido');
+    await expect(target.locator('.book-grid .book-card')).toHaveCount(1);
+    await target.setViewportSize({width:390,height:844});
+    expect(await target.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await target.screenshot({path:`artifacts/${test.info().project.name}-backup-mobile.png`,fullPage:true});
+  }finally{await targetContext.close();}
+});

@@ -1,0 +1,84 @@
+[
+  {
+    "engine": "wasm",
+    "firstPlaybackMs": 10160,
+    "changes": [
+      {
+        "atMs": 1065,
+        "playing": false,
+        "time": 0,
+        "paragraph": "Seleccionar párrafo 1",
+        "status": "Cargando Kokoro · WASM · 0 fragmentos listos por adelantado · 1 s transcurridos"
+      },
+      {
+        "atMs": 10160,
+        "playing": true,
+        "time": 0,
+        "paragraph": "Seleccionar párrafo 1",
+        "status": "Preparando por adelantado · Sintetizando fragmento 1 de 1 · WASM · 0 fragmentos listos por adelantado · Primer audio: 9.9 s · 10 s transcurridos"
+      },
+      {
+        "atMs": 15201,
+        "playing": false,
+        "time": 3.8,
+        "paragraph": "Seleccionar párrafo 1",
+        "status": "Esperando audio… La generación todavía no alcanza la reproducción. · 0 fragmentos listos por adelantado · Primer audio: 9.9 s · 15 s transcurridos"
+      },
+      {
+        "atMs": 26302,
+        "playing": true,
+        "time": 0.569516,
+        "paragraph": "Seleccionar párrafo 1",
+        "status": "Preparando por adelantado · Sintetizando fragmento 1 de 1 · WASM · 0 fragmentos listos por adelantado · Primer audio: 9.9 s · 26 s transcurridos"
+      },
+      {
+        "atMs": 36384,
+        "playing": true,
+        "time": 0.760335,
+        "paragraph": "Seleccionar párrafo 2",
+        "status": "Audio listo. · 1 fragmentos listos por adelantado · Primer audio: 9.9 s · 36 s transcurridos"
+      }
+    ]
+  },
+  {
+    "engine": "webgpu",
+    "firstPlaybackMs": 32422,
+    "changes": [
+      {
+        "atMs": 1088,
+        "playing": false,
+        "time": 0,
+        "paragraph": "Seleccionar párrafo 1",
+        "status": "onnx/model.onnx: 20.4 MB · 0 fragmentos listos por adelantado · 1 s transcurridos"
+      },
+      {
+        "atMs": 32422,
+        "playing": true,
+        "time": 0,
+        "paragraph": "Seleccionar párrafo 1",
+        "status": "Preparando por adelantado · Sintetizando fragmento 1 de 1 · WEBGPU · 0 fragmentos listos por adelantado · Primer audio: 32.1 s · 32 s transcurridos"
+      },
+      {
+        "atMs": 37485,
+        "playing": false,
+        "time": 3.875,
+        "paragraph": "Seleccionar párrafo 1",
+        "status": "Esperando audio… La generación todavía no alcanza la reproducción. · 0 fragmentos listos por adelantado · Primer audio: 32.1 s · 37 s transcurridos"
+      },
+      {
+        "atMs": 44593,
+        "playing": true,
+        "time": 0,
+        "paragraph": "Seleccionar párrafo 1",
+        "status": "Preparando por adelantado · Sintetizando fragmento 1 de 1 · WEBGPU · 0 fragmentos listos por adelantado · Primer audio: 32.1 s · 44 s transcurridos"
+      },
+      {
+        "atMs": 54743,
+        "playing": true,
+        "time": 0.271412,
+        "paragraph": "Seleccionar párrafo 2",
+        "status": "Audio listo. · 1 fragmentos listos por adelantado · Primer audio: 32.1 s · 54 s transcurridos"
+      }
+    ]
+  }
+]

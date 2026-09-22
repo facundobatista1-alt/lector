@@ -1,0 +1,38 @@
+{
+  "pages": 59,
+  "blocks": 200,
+  "chapters": [
+    {
+      "id": "chapter-p1-b0",
+      "title": "Inicio",
+      "block": 0,
+      "page": 1,
+      "pageLabel": "1",
+      "level": 0,
+      "source": "fallback",
+      "kind": "content"
+    },
+    {
+      "id": "chapter-p2-b1",
+      "title": "LA POLÍTICA COMO VOCACIÓN",
+      "block": 6,
+      "page": 2,
+      "pageLabel": "2",
+      "level": 0,
+      "source": "detected",
+      "kind": "content"
+    },
+    {
+      "id": "chapter-p39-b1",
+      "title": "LA CIENCIA COMO VOCACIÓN",
+      "block": 133,
+      "page": 39,
+      "pageLabel": "39",
+      "level": 0,
+      "source": "detected",
+      "kind": "content"
+    }
+  ],
+  "noiseBlocks": 1,
+  "supplementBlocks": 0
+}
