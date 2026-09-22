@@ -7,6 +7,7 @@ const SESSION_KEY = 'lumbre-supabase-session-v1';
 type Session = { access_token: string; user: { id: string } };
 type RemoteBook = { id: string; owner: string; data: Omit<Book, 'file'>; updated_at: string };
 export const supabaseConfigured = Boolean(URL && KEY);
+export function hasSupabaseSession() { return Boolean(localStorage.getItem(SESSION_KEY)); }
 
 async function request(path: string, init: RequestInit = {}, token?: string) {
   const headers = new Headers(init.headers); headers.set('apikey', KEY); if (token) headers.set('Authorization', `Bearer ${token}`);
@@ -17,10 +18,11 @@ async function request(path: string, init: RequestInit = {}, token?: string) {
 }
 async function session(): Promise<Session> {
   const cached = localStorage.getItem(SESSION_KEY); if (cached) { try { return JSON.parse(cached) as Session; } catch { localStorage.removeItem(SESSION_KEY); } }
-  const response = await request('/auth/v1/signup', { method: 'POST', body: '{}' });
-  const value = await response.json() as Session; if (!value.access_token || !value.user?.id) throw new Error('Supabase no devolvió una sesión anónima. Activá Anonymous sign-ins.');
-  localStorage.setItem(SESSION_KEY, JSON.stringify(value)); return value;
+  throw new Error('Iniciá sesión para sincronizar tus libros entre dispositivos.');
 }
+export async function signIn(email: string, password: string) { const response = await request('/auth/v1/token?grant_type=password', { method: 'POST', body: JSON.stringify({ email, password }) }); const value = await response.json() as Session; localStorage.setItem(SESSION_KEY, JSON.stringify(value)); return value; }
+export async function signUp(email: string, password: string) { const response = await request('/auth/v1/signup', { method: 'POST', body: JSON.stringify({ email, password }) }); const value = await response.json() as Session; if (value.access_token) localStorage.setItem(SESSION_KEY, JSON.stringify(value)); return value; }
+export function signOut() { localStorage.removeItem(SESSION_KEY); }
 async function upsert(path: string, rows: unknown[], token: string) { if (!rows.length) return; await request(path, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(rows) }, token); }
 async function uploadPDF(book: Book, owner: string, token: string) {
   if (!book.file.size) return;
