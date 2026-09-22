@@ -5,7 +5,7 @@ const SHELL = `lumbre-shell-${REVISION}`;
 const paths = new Set(PRECACHE);
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(SHELL).then(cache => cache.addAll(PRECACHE)));
+  event.waitUntil(caches.open(SHELL).then(cache => cache.addAll(PRECACHE)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
