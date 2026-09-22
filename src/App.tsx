@@ -13,6 +13,7 @@ import { SAMPLE } from './tts/sample';
 import { BookPlayer, initialPlayer } from './audio/player';
 import { calibrateDora } from './tts/calibrate';
 import { importPDF, upgradeBook } from './pdf/extract';
+import { syncNow } from './sync/supabase';
 import type { Block, Book, Engine, Measurement, Voice, Position, Chapter } from './types';
 
 const demo: Block[] = SAMPLE.map((text, i) => ({ id: `demo-${i}`, text, page: 1, pageLabel: 'muestra', endPage: 1 }));
@@ -35,6 +36,7 @@ export default function App() {
   const [rate, setRate] = useState(1);
   const [status, setStatus] = useState('Cargando biblioteca…');
   const [error, setError] = useState('');
+  const [syncMessage, setSyncMessage] = useState('');
   const [importing, setImporting] = useState(true);
   const [calibrating, setCalibrating] = useState(false);
   const calibration = useRef<AbortController | null>(null);
@@ -71,6 +73,12 @@ export default function App() {
   const currentChapter = chapterAt(chapters,index);
   const chapterIndex = chapters.findIndex(c => c.id === (browsedChapter ?? currentChapter)?.id);
   useEffect(() => { const subscription = liveQuery(() => db.positions.toArray()).subscribe({ next: setPositions, error: e => setError(message(e)) }); return () => subscription.unsubscribe(); }, []);
+  useEffect(() => {
+    let alive = true;
+    const sync = () => void syncNow().then(result => { if (alive && !result.skipped) setSyncMessage(result.message); }).catch(e => { if (alive) setSyncMessage(`Sincronización pendiente: ${message(e)}`); });
+    const timer = window.setInterval(sync, 30000); window.addEventListener('online', sync); sync();
+    return () => { alive = false; window.clearInterval(timer); window.removeEventListener('online', sync); };
+  }, []);
   const busy = state.busy;
   const playing = state.playing;
   const url = state.ready;
@@ -246,7 +254,7 @@ export default function App() {
             </aside>
           </div>
         </>}
-        {tab === 'library' && <><OfflinePanel bookId={book?.id} title={book?.title}/><BackupPanel disabled={calibrating || importing} beforeExport={async()=>{await player.current?.persist();}} beforeImport={beforeImport} afterImport={afterImport}/><Library books={books} positions={positions} disabled={calibrating || importing} importing={importing} onOpen={item => void openBook(item).catch(e => setError(message(e)))} onResume={item => void openBook(item,true).catch(e => setError(message(e)))} onUpload={file => void upload(file)} onDemo={() => void openBook().catch(e => setError(message(e)))}/><div className="status" role="status">{status || (book ? state.status : 'Tus libros quedan guardados en este navegador.')}</div></>}
+        {tab === 'library' && <><OfflinePanel bookId={book?.id} title={book?.title}/><BackupPanel disabled={calibrating || importing} beforeExport={async()=>{await player.current?.persist();}} beforeImport={beforeImport} afterImport={afterImport}/><Library books={books} positions={positions} disabled={calibrating || importing} importing={importing} onOpen={item => void openBook(item).catch(e => setError(message(e)))} onResume={item => void openBook(item,true).catch(e => setError(message(e)))} onUpload={file => void upload(file)} onDemo={() => void openBook().catch(e => setError(message(e)))}/><div className="status" role="status">{syncMessage || status || (book ? state.status : 'Tus libros quedan guardados en este navegador.')}</div></>}
         {tab === 'findings' && <section className="results"><div className="result-actions"><button onClick={() => download(new Blob([JSON.stringify(measurements, null, 2)], { type: 'application/json' }), 'lumbre-mediciones.json')}>↓ Exportar mediciones</button><span>{measurements.length} pruebas · cache excluido de mediciones</span></div><p>RTF = tiempo de generación / duración de audio. Memoria JS, cuando existe, no incluye toda la memoria WASM ni GPU. WebGPU puede ejecutar algunos operadores en CPU. Compará muestras del mismo texto.</p><div className="table-scroll"><table><thead><tr><th>Voz / motor</th><th>Carga</th><th>Generación</th><th>Audio</th><th>RTF</th><th>PCM</th><th>Memoria JS</th><th>Escucha humana</th></tr></thead><tbody>{measurements.map(m => <tr key={m.id}><td>{m.voice}<small>{m.actual}{m.fallback ? ' · fallback' : ''}</small></td><td>{(m.loadMs / 1000).toFixed(1)} s</td><td>{(m.generationMs / 1000).toFixed(1)} s</td><td>{m.audioSeconds.toFixed(1)} s</td><td>{m.rtf.toFixed(2)}</td><td>{(m.pcmBytes / 1048576).toFixed(1)} MB</td><td>{m.jsHeapBytes ? `${(m.jsHeapBytes / 1048576).toFixed(0)} MB` : 'No disponible'}</td><td><select aria-label={`Calidad de prueba ${m.id}`} value={m.rating ?? ''} onChange={async e => { await db.measurements.update(m.id!, { rating: e.target.value }); setMeasurements(await db.measurements.orderBy('createdAt').reverse().toArray()); }}><option value="">Sin evaluar</option><option>Agradable</option><option>Aceptable</option><option>Fatigante</option><option>Errores de pronunciación</option></select></td></tr>)}</tbody></table></div>{!measurements.length && <div className="empty">Todavía no hay síntesis medidas. Prepará un párrafo en el laboratorio.</div>}<div className="notice">La aprobación de la voz requiere escucha humana. Android real, dos horas continuas y bloqueo de pantalla permanecen pendientes. Las pruebas de interfaz no demuestran esas capacidades.</div></section>}
       </div>
     </main>
