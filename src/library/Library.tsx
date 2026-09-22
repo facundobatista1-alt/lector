@@ -2,8 +2,8 @@ import { useState } from 'react';
 import type { Book, Position } from '../types';
 import { chapterAt } from '../reader/chapters';
 import { libraryBooks, progressPercent, type LibrarySort } from './progress';
-interface Props { books: Book[]; positions: Position[]; disabled: boolean; importing: boolean; onOpen: (book: Book) => void; onResume: (book: Book) => void; onUpload: (file?: File) => void; onDemo: () => void }
-export function Library({books,positions,disabled,importing,onOpen,onResume,onUpload,onDemo}: Props) {
+interface Props { books: Book[]; positions: Position[]; disabled: boolean; importing: boolean; onOpen: (book: Book) => void; onResume: (book: Book) => void; onUpload: (file?: File) => void }
+export function Library({books,positions,disabled,importing,onOpen,onResume,onUpload}: Props) {
   const [query,setQuery] = useState(''); const [sort,setSort] = useState<LibrarySort>('recent');
   const recent = libraryBooks(books,positions,'','recent')[0];
   const positionFor = (book: Book) => positions.find(p => p.bookId === book.id);
@@ -24,6 +24,5 @@ export function Library({books,positions,disabled,importing,onOpen,onResume,onUp
     <div className="library-tools"><label>Buscar libros<input type="search" value={query} onChange={e => setQuery(e.target.value)} placeholder="Título o autor"/></label><label>Ordenar por<select value={sort} onChange={e => setSort(e.target.value as LibrarySort)}><option value="recent">Recientes</option><option value="title">Título</option><option value="author">Autor</option><option value="progress">Progreso</option></select></label></div>
     <div className="book-grid">{filtered.map(item => <button className="book-card" key={item.id} disabled={disabled} onClick={() => onOpen(item)} aria-label={`Abrir ${item.title}`}><span className="book-cover" aria-hidden="true">{item.title.slice(0,1)}<small>{item.pages} PÁGINAS</small></span><strong>{item.title}</strong><span>{item.author ?? 'Autor no indicado'}</span><span>{location(item)}</span><progress max="100" value={progress(item)} aria-label={`Progreso de ${item.title}`}/><span>{progress(item)}% recorrido</span>{!!item.needsOCR.length && <span>Contiene páginas sin texto extraíble</span>}</button>)}</div>
     {!filtered.length && <p className="empty">{books.length ? 'No hay libros que coincidan con la búsqueda.' : 'Agregá tu primer PDF. Dora preparará audio mientras leés.'}</p>}
-    <button className="text-button demo-link" disabled={disabled} onClick={onDemo}>Abrir muestra de lectura</button>
   </>;
 }
