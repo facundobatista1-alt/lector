@@ -30,6 +30,7 @@ export class BookPlayer {
   private ahead = 0;
   private automatic = false;
   private buffering = true;
+  private selectedStart = false;
   private fillToEnd = false;
   private startTime = 0;
   private savedTime = 0;
@@ -98,6 +99,7 @@ export class BookPlayer {
     const cursor = this.segments.findIndex(s => s.block >= block);
     if (cursor < 0) return;
     void this.persist(); this.stop(); this.cursor = cursor; this.savedTime = 0; this.completed = false; this.patchCursor();
+    this.selectedStart = true;
     this.patch({ status: 'Párrafo seleccionado.', error: '', firstAudioMs: undefined }); await this.persist();
     this.prepareAll();
     if (autoplay) this.start();
@@ -139,6 +141,7 @@ export class BookPlayer {
   private reserve() { let seconds = 0; for (let i = this.cursor; this.prepared.has(i); i++) seconds += this.prepared.get(i)!.duration; return Math.max(0,seconds-this.savedTime); }
   cancel(release = false) { void this.persist(); this.stop(); if (release) this.provider.dispose(); this.patch({ status: 'Preparación cancelada.' }); }
   private stop() {
+    this.selectedStart = false;
     this.recovered.clear();
     this.epoch++; if (this.running) this.provider.dispose(); this.running = false; this.audio.pause();
     this.audio.removeAttribute('src'); this.audio.load();
@@ -183,11 +186,12 @@ export class BookPlayer {
     } else if (this.state.wanted && this.audio.readyState >= 1) this.playLoaded();
   }
   private playLoaded() {
-    if (this.buffering && !this.recovered.has(this.cursor) && this.reserve()/this.speed < this.policy.startSeconds) {
+    if (this.buffering && !this.selectedStart && !this.recovered.has(this.cursor) && this.reserve()/this.speed < this.policy.startSeconds) {
       let end = this.cursor; while (this.prepared.has(end)) end++;
       if (end < this.segments.length) { this.patch({ status: `Preparando reserva: ${Math.floor(this.reserve()/this.speed)} de ${this.policy.startSeconds} segundos. Empezará automáticamente.` }); return; }
     }
     this.buffering = false;
+    this.selectedStart = false;
     const epoch = this.epoch;
     void this.audio.play().catch(error => { if (epoch === this.epoch && this.state.wanted) { this.patch({ wanted: false, error: `El navegador no inició el audio. Pulsá Escuchar: ${String(error)}` }); } });
   }

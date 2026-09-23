@@ -233,3 +233,7 @@ No es honesto considerar terminado el MVP hasta superar estas pruebas. La altern
 ### Resume cached audio without initial buffer wait
 
 Existing cached fragments now bypass the 30-second startup reserve requirement. Newly synthesized fragments retain buffering behavior. Regression test verifies immediate playback of one cached 5-second fragment while the next synthesis is pending. Build, lint and 53 unit tests pass. This does not establish whether a particular user book has finished generating on their device.
+
+### Selected Weber paragraph - 2026-09-23
+
+Reproduced the screenshot flow using the authorized local Weber PDF, paragraph 14, Chrome and Dora WASM. Before: audio available at 26s (8s reserve) but playback waited for the 30s threshold and started at 76s. After: explicit paragraph selection bypasses the initial reserve once, and playback started at 26s from a cold browser context. Subsequent synthesis is still progressive; these timings are not hardware guarantees. Mini-player now exposes the real preparation stage/error. Build, lint, 54 unit tests and the real-PDF E2E passed.
