@@ -5,7 +5,7 @@ import { Notes } from './annotations/Notes';
 import { OfflinePanel } from './pwa/OfflinePanel';
 import { captureQuote } from './annotations/quotes';
 import { ChapterNav } from './reader/ChapterNav';
-import { audioBlocks, chapterAt } from './reader/chapters';
+import { audioBlocks, chapterAt, STRUCTURE_VERSION } from './reader/chapters';
 import { db, repairStoredBooks } from './storage/db';
 import { LocalTTSProvider } from './tts/provider';
 import { SAMPLE } from './tts/sample';
@@ -87,8 +87,9 @@ export default function App() {
       const storedBooks = await db.books.toArray();
       const storedPositions = await db.positions.orderBy('updatedAt').reverse().toArray();
       const position = storedPositions.find(p => storedBooks.some(b => b.id === p.bookId));
-      let savedBook = position?.bookId === 'demo' ? undefined : position ? await db.books.get(position.bookId) : undefined;
-      if (savedBook) savedBook = await upgradeBook(savedBook, setStatus);
+      const savedBook = position?.bookId === 'demo' ? undefined : position ? await db.books.get(position.bookId) : undefined;
+      // Restore stored text immediately. PDF reprocessing belongs to explicit opening,
+      // otherwise a slow PDF worker blocks the entire library on mobile startup.
       const saved = position ? await db.positions.get(position.bookId) : undefined;
       const library = await db.books.orderBy('importedAt').reverse().toArray();
       if (!alive) return;
@@ -122,7 +123,7 @@ export default function App() {
   function cancel() { calibration.current?.abort(); player.current?.cancel(); }
   function prepare(all = false) { setStatus(''); if (all) player.current?.prepareAll(); else player.current?.prepare(); }
   async function openBook(next?: Book, autoplay = false) {
-    if (next && book?.id === next.id) {
+    if (next && book?.id === next.id && next.structureVersion === STRUCTURE_VERSION) {
       setBook(next); setTab('lab'); setBrowsedChapter(undefined);
       if (autoplay) player.current?.start();
       else if (!player.current?.state.ready && !player.current?.state.busy) player.current?.prepareAll();

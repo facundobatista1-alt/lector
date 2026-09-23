@@ -2,6 +2,30 @@ import { expect, test } from '@playwright/test';
 import { samplePDF } from '../fixture';
 test.setTimeout(45000);
 
+test('un libro pendiente de actualizar no bloquea agregar PDFs al iniciar', async ({page,context}) => {
+  await page.goto('/');
+  await page.getByLabel('Agregar PDF').setInputFiles({name:'inicio.pdf',mimeType:'application/pdf',buffer:samplePDF()});
+  await expect(page.getByRole('heading',{name:'Libro de prueba',exact:true})).toBeVisible();
+  await page.evaluate(() => new Promise<void>((resolve,reject) => {
+    const request = indexedDB.open('lumbre-v1');
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const database=request.result;
+      const transaction=database.transaction('books','readwrite');
+      const store=transaction.objectStore('books');
+      const read=store.getAll();
+      read.onsuccess=()=>{for(const book of read.result) store.put({...book,structureVersion:0});};
+      transaction.oncomplete=()=>{database.close();resolve();};
+      transaction.onerror=()=>{database.close();reject(transaction.error);};
+    };
+  }));
+  await context.route('**/*pdf.worker*',route=>route.abort());
+  await page.reload();
+  await expect(page.getByLabel('Agregar PDF')).toBeEnabled();
+  await expect(page.getByRole('button',{name:'Abrir Libro de prueba',exact:true})).toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+});
+
 test('restaura libro y párrafo, permite guardar y eliminar cita y actualizar en móvil', async ({ page, context }) => {
   await context.route('**/*', route => ['localhost','127.0.0.1'].includes(new URL(route.request().url()).hostname) ? route.continue() : route.abort());
   await page.goto('/');
