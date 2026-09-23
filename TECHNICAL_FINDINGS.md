@@ -229,3 +229,7 @@ No es honesto considerar terminado el MVP hasta superar estas pruebas. La altern
 - Cached nearby WAV loading runs independently of synthesis. A slow distant synthesis no longer blocks playback of already cached upcoming segments.
 - 52 unit tests pass, including cold Play/full generation, pause, reopen cache reuse, seeking and cached playback while a distant synthesis is unresolved. Build and lint pass.
 - Full preparation remains local and requires the app to stay running; it cannot make synthesis faster than real time or keep generating after the browser is closed. Cached audio is device-specific, so PC preparation does not transfer WAV files to iPhone.
+
+### Resume cached audio without initial buffer wait
+
+Existing cached fragments now bypass the 30-second startup reserve requirement. Newly synthesized fragments retain buffering behavior. Regression test verifies immediate playback of one cached 5-second fragment while the next synthesis is pending. Build, lint and 53 unit tests pass. This does not establish whether a particular user book has finished generating on their device.

@@ -14,6 +14,21 @@ class AudioStub extends EventTarget {
 const sample: Synthesis = { samples: new Float32Array(120000),sampleRate:24000,measurement:{voice:'ef_dora',requested:'wasm',actual:'wasm',loadMs:0,generationMs:1,audioSeconds:5,rtf:.1,pcmBytes:480000} };
 const blocks = Array.from({length:8},(_,i) => ({id:String(i),text:`Párrafo ${i}.`,page:1,pageLabel:'1',endPage:1}));
 const players: BookPlayer[] = [];
+it('Continuar reproduce el fragmento guardado sin esperar 30 segundos de reserva', async () => {
+  const wav=new Blob(['cached-audio']);
+  await db.audio.put({key:await audioKey(blocks[0].text,'ef_dora','wasm'),wav,bytes:wav.size,duration:5,touchedAt:1});
+  let finish!: (value:Synthesis)=>void;
+  const provider={synthesize:vi.fn(()=>new Promise<Synthesis>(resolve=>{finish=resolve;})),dispose:vi.fn()};
+  const audio=new AudioStub();
+  const player=new BookPlayer(audio as unknown as HTMLAudioElement,provider,()=>{},()=>{});players.push(player);
+  player.configure('resume-cached',blocks.slice(0,2),'ef_dora','wasm',1);
+  player.start();
+  await vi.waitFor(()=>expect(audio.paused).toBe(false));
+  expect(player.state.reserveSeconds).toBeLessThan(30);
+  await vi.waitFor(()=>expect(provider.synthesize).toHaveBeenCalledTimes(1));
+  finish(sample);
+  await vi.waitFor(()=>expect(player.state.busy).toBe(false));
+});
 it('prepara todo aunque se pause y reutiliza el audio después de volver a abrir', async () => {
   const provider = {synthesize:vi.fn().mockResolvedValue(sample),dispose:vi.fn()};
   const player = new BookPlayer(new AudioStub() as unknown as HTMLAudioElement,provider,()=>{},()=>{},{startSeconds:0,targetSeconds:5}); players.push(player);

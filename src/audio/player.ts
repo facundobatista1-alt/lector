@@ -19,6 +19,7 @@ export class BookPlayer {
   private loaded = -1;
   private ready = new Map<number, AudioRecord>();
   private prepared = new Map<number, { duration: number }>();
+  private recovered = new Set<number>();
   private url = '';
   private primeUrl = '';
   private priming = false;
@@ -138,6 +139,7 @@ export class BookPlayer {
   private reserve() { let seconds = 0; for (let i = this.cursor; this.prepared.has(i); i++) seconds += this.prepared.get(i)!.duration; return Math.max(0,seconds-this.savedTime); }
   cancel(release = false) { void this.persist(); this.stop(); if (release) this.provider.dispose(); this.patch({ status: 'Preparación cancelada.' }); }
   private stop() {
+    this.recovered.clear();
     this.epoch++; if (this.running) this.provider.dispose(); this.running = false; this.audio.pause();
     this.audio.removeAttribute('src'); this.audio.load();
     if (this.url) URL.revokeObjectURL(this.url); this.url = '';
@@ -160,6 +162,7 @@ export class BookPlayer {
         const record = await db.audio.get(key);
         if (epoch !== this.epoch) return;
         if (record && index >= this.cursor && index <= this.cursor+3) {
+          this.recovered.add(index);
           this.prepared.set(index,{duration:record.duration}); this.ready.set(index,record);
           this.present(); this.patch({preparedCount:this.prepared.size,reserveSeconds:this.reserve()/this.speed});
         }
@@ -180,7 +183,7 @@ export class BookPlayer {
     } else if (this.state.wanted && this.audio.readyState >= 1) this.playLoaded();
   }
   private playLoaded() {
-    if (this.buffering && this.reserve()/this.speed < this.policy.startSeconds) {
+    if (this.buffering && !this.recovered.has(this.cursor) && this.reserve()/this.speed < this.policy.startSeconds) {
       let end = this.cursor; while (this.prepared.has(end)) end++;
       if (end < this.segments.length) { this.patch({ status: `Preparando reserva: ${Math.floor(this.reserve()/this.speed)} de ${this.policy.startSeconds} segundos. Empezará automáticamente.` }); return; }
     }
@@ -235,6 +238,7 @@ export class BookPlayer {
               await db.measurements.add({ ...result.measurement, createdAt: Date.now(), userAgent: navigator.userAgent }); this.measured();
             } catch (error) { if (epoch === this.epoch) this.patch({ error: `No se pudo guardar más audio. Liberá espacio y reanudá la preparación: ${String(error)}` }); if (this.fillToEnd) break; }
           } else {
+            this.recovered.add(target);
             this.prepared.set(target,{ duration: cached.duration });
             this.ready.set(target,cached); this.present();
             await db.audio.update(key,{ touchedAt: Date.now() });
