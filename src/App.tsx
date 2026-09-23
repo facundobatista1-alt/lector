@@ -100,8 +100,9 @@ export default function App() {
       setVoice(v); setEngine(e); setRate(r);
       instance.configure(savedBook?.id ?? 'demo',savedBook ? audioBlocks(savedBook) : demo,v,e,r,saved);
       setStatus(''); setImporting(false);
-      // La síntesis empieza al pulsar Play. Prepararla durante el arranque
-      // dejaba el indicador de carga de Safari activo indefinidamente.
+      if (savedBook && !mobile) instance.prepareAll();
+      // On iPhone defer synthesis until interaction to avoid a stuck Safari
+      // loading indicator. Desktop resumes unfinished preparation on reopening.
     })().catch(e => { if (alive) { setError(message(e)); setImporting(false); } });
     const flush = () => { if(!transferring.current) void instance.persist(); };
     window.addEventListener('pagehide',flush); document.addEventListener('visibilitychange',flush);
@@ -208,7 +209,7 @@ export default function App() {
             {busy || calibrating ? <button onClick={cancel}>Cancelar</button> : <button disabled={!blocks.length || importing} onClick={() => void prepare(true)}>Preparar libro completo</button>}
             <p className="download-note">Dora prepara el libro completo en segundo plano. Podés escuchar los fragmentos listos mientras continúa la generación.</p>
           </section></details>
-          <div className="status" role="status"><span className={busy ? 'working' : 'privacy-dot'}/>{status || state.status} · Reserva: {Math.floor(state.reserveSeconds / 60)} min {Math.floor(state.reserveSeconds % 60)} s{busy && <span className="elapsed"> · {elapsed} s transcurridos</span>}</div>
+          <div className="status" role="status"><span className={busy ? 'working' : 'privacy-dot'}/>{status || state.status}{state.totalSegments > 0 && <span> · Audio preparado: {state.preparedCount}/{state.totalSegments} fragmentos</span>} · Reserva: {Math.floor(state.reserveSeconds / 60)} min {Math.floor(state.reserveSeconds % 60)} s{busy && <span className="elapsed"> · {elapsed} s transcurridos</span>}</div>
           {!!chapters.length && <div className="chapter-controls"><button disabled={importing || calibrating || chapterIndex <= 0} onClick={() => void selectChapter(chapters[chapterIndex-1]).catch(e => setError(message(e)))}>← Capítulo anterior</button><span>{(browsedChapter ?? currentChapter)?.title}</span><button disabled={importing || calibrating || chapterIndex < 0 || chapterIndex >= chapters.length-1} onClick={() => void selectChapter(chapters[chapterIndex+1]).catch(e => setError(message(e)))}>Capítulo siguiente →</button></div>}
           <div className="reading-layout">
             <section className="paper" aria-label="Texto del libro">

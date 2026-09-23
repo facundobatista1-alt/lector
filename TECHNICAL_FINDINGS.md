@@ -221,3 +221,11 @@ No es honesto considerar terminado el MVP hasta superar estas pruebas. La altern
 - Added Update app and Sync now controls; fixed service-worker cache fallback and blocked conflicting imports during startup/import. Chapter list is collapsed initially to reduce mobile clutter.
 - Verification: build and lint pass; 50 unit tests pass. New reader/selection/restore/quote/delete/update E2E passed in Chrome and Edge at 390 px; real Dora synthesis/playback/quote-edit/clipboard E2E passed in Chrome. Screenshot inspected. Historical laboratory/backup tests refer to removed UI and were not treated as current acceptance tests.
 - Limits: no physical iPhone test in this revision; no two-hour playback, full-library quota stress test, or authenticated PC-to-iPhone Supabase integration test. Sync transport/conflict behavior tested with mocked REST responses. Timestamp conflicts still depend on device clocks. Browser background generation cannot be guaranteed on iOS. OCR, translation and local study AI remain pending.
+
+## Continuous preparation regression - 2026-09-23
+
+- Play now always enables full-book preparation, including after configure/reopen. Desktop startup resumes preparation of the stored book without reprocessing the PDF; mobile still defers startup synthesis until interaction.
+- Seeking prioritizes the new location, then fills uncached earlier segments. Pause leaves preparation running. The reader exposes prepared/total segment counts.
+- Cached nearby WAV loading runs independently of synthesis. A slow distant synthesis no longer blocks playback of already cached upcoming segments.
+- 52 unit tests pass, including cold Play/full generation, pause, reopen cache reuse, seeking and cached playback while a distant synthesis is unresolved. Build and lint pass.
+- Full preparation remains local and requires the app to stay running; it cannot make synthesis faster than real time or keep generating after the browser is closed. Cached audio is device-specific, so PC preparation does not transfer WAV files to iPhone.

@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { afterEach, expect, it, vi } from 'vitest';
 import { BookPlayer } from '../../src/audio/player';
-import { db } from '../../src/storage/db';
+import { audioKey, db } from '../../src/storage/db';
 import type { Synthesis, TTSProvider } from '../../src/types';
 class AudioStub extends EventTarget {
   private source = ''; currentTime = 0; duration = 5; playbackRate = 1; preservesPitch = true; readyState = 1; paused = true;
@@ -25,9 +25,38 @@ it('prepara todo aunque se pause y reutiliza el audio después de volver a abrir
   await player.select(5,false);
   await vi.waitFor(() => expect(player.state.busy).toBe(false));
   player.configure('whole-book',blocks,'ef_dora','wasm',1);
-  player.prepareAll();
+  player.start();
   await vi.waitFor(() => expect(player.state.buffered).toBe(7));
   expect(provider.synthesize).toHaveBeenCalledTimes(8);
+});
+it('lee WAV guardados mientras una síntesis lejana sigue pendiente', async () => {
+  const extended=[...blocks,{...blocks[0],id:'last',text:'Último párrafo pendiente.'}];
+  for (const block of blocks) {
+    const wav=new Blob(['cached-audio']);
+    await db.audio.put({key:await audioKey(block.text,'ef_dora','wasm'),wav,bytes:wav.size,duration:5,touchedAt:1});
+  }
+  let finish!: (value:Synthesis)=>void;
+  const provider={synthesize:vi.fn(()=>new Promise<Synthesis>(resolve=>{finish=resolve;})),dispose:vi.fn()};
+  const audio=new AudioStub();
+  const player=new BookPlayer(audio as unknown as HTMLAudioElement,provider,()=>{},()=>{},{startSeconds:0,targetSeconds:5});players.push(player);
+  player.configure('cached-continuity',extended,'ef_dora','wasm',1);player.start();
+  await vi.waitFor(()=>expect(provider.synthesize).toHaveBeenCalledTimes(1));
+  for(let block=1;block<=5;block++) {
+    audio.paused=true;audio.dispatchEvent(new Event('ended'));
+    await vi.waitFor(()=>{expect(player.state.block).toBe(block);expect(audio.paused).toBe(false);});
+  }
+  expect(player.state.busy).toBe(true);
+  finish(sample);
+  await vi.waitFor(()=>expect(player.state.preparedCount).toBe(9));
+});
+it('al saltar prioriza la nueva posición y después completa lo anterior', async () => {
+  const provider={synthesize:vi.fn().mockResolvedValue(sample),dispose:vi.fn()};
+  const player=new BookPlayer(new AudioStub() as unknown as HTMLAudioElement,provider,()=>{},()=>{});players.push(player);
+  player.configure('jump-fill',blocks,'ef_dora','wasm',1);
+  await player.select(5,false);
+  await vi.waitFor(()=>expect(player.state.preparedCount).toBe(8));
+  expect(provider.synthesize.mock.calls[0][0]).toBe(blocks[5].text);
+  expect(await db.audio.count()).toBe(8);
 });
 it('no renueva un avance sin cambios y restaura un avance remoto estando en pausa', async () => {
   const provider = {synthesize:vi.fn().mockResolvedValue(sample),dispose:vi.fn()};
@@ -56,7 +85,7 @@ it('activa el mismo elemento de audio durante el toque en iPhone y luego reprodu
   await vi.waitFor(() => expect(play).toHaveBeenCalledTimes(2));
   expect(player.state.playing).toBe(true);
 });
-it('limita la cola, pausa durante generación y sigue al terminar el audio', async () => {
+it('Play prepara todo, continúa en pausa y sigue al terminar el audio', async () => {
   const audio = new AudioStub();
   let complete!: (value: Synthesis) => void;
   const synthesize = vi.fn().mockImplementationOnce(() => new Promise<Synthesis>(resolve => { complete = resolve; })).mockResolvedValue(sample);
@@ -65,12 +94,12 @@ it('limita la cola, pausa durante generación y sigue al terminar el audio', asy
   player.configure('queue-test',blocks,'ef_dora','wasm',1);
   player.start(); player.pause();
   await vi.waitFor(() => expect(synthesize).toHaveBeenCalledTimes(1)); complete(sample);
-  await vi.waitFor(() => expect(player.state.buffered).toBe(3));
-  expect(synthesize).toHaveBeenCalledTimes(4); expect(audio.paused).toBe(true);
+  await vi.waitFor(() => expect(player.state.preparedCount).toBe(8));
+  expect(synthesize).toHaveBeenCalledTimes(8); expect(audio.paused).toBe(true);
   player.start(); await vi.waitFor(() => expect(audio.paused).toBe(false));
   audio.dispatchEvent(new Event('ended'));
   await vi.waitFor(() => expect(player.state.block).toBe(1));
-  await vi.waitFor(() => expect(synthesize).toHaveBeenCalledTimes(5));
+  expect(synthesize).toHaveBeenCalledTimes(8);
   audio.currentTime = 2; audio.dispatchEvent(new Event('timeupdate')); player.pause(); await player.persist();
   expect(await db.positions.get('queue-test')).toMatchObject({block:1,segment:0,seconds:2});
 });
@@ -113,8 +142,9 @@ it('prepara al abrir sin reproducir y Play espera la reserva', async () => {
   expect(audio.paused).toBe(true); player.start(); expect(audio.paused).toBe(true);
   pending[1](sample); await vi.waitFor(() => expect(audio.paused).toBe(false));
   await vi.waitFor(() => expect(pending).toHaveLength(3)); pending[2](sample);
+  for (let i=3;i<8;i++) { await vi.waitFor(() => expect(pending).toHaveLength(i+1)); pending[i](sample); }
   await vi.waitFor(() => expect(player.state.busy).toBe(false));
-  expect(player.state.reserveSeconds).toBe(15); expect(provider.synthesize).toHaveBeenCalledTimes(3);
+  expect(player.state.reserveSeconds).toBe(40); expect(provider.synthesize).toHaveBeenCalledTimes(8);
 });
 it('salta bloques omitidos al restaurar y guarda final explícito del libro', async () => {
   const audio = new AudioStub(); const provider = {synthesize:vi.fn().mockResolvedValue(sample),dispose:vi.fn()};

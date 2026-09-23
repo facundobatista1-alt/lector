@@ -7,8 +7,9 @@ import { calibratedEngine } from '../tts/calibrate';
 export interface PlayerState {
   block: number; part: number; seconds: number; duration: number; playing: boolean; wanted: boolean;
   busy: boolean; ready: boolean; buffered: number; reserveSeconds: number; status: string; error: string; firstAudioMs?: number;
+  preparedCount: number; totalSegments: number;
 }
-export const initialPlayer: PlayerState = { block: 0, part: 0, seconds: 0, duration: 0, playing: false, wanted: false, busy: false, ready: false, buffered: 0, reserveSeconds: 0, status: 'Pulsá Escuchar para empezar.', error: '' };
+export const initialPlayer: PlayerState = { block: 0, part: 0, seconds: 0, duration: 0, playing: false, wanted: false, busy: false, ready: false, buffered: 0, reserveSeconds: 0, preparedCount: 0, totalSegments: 0, status: 'Pulsá Escuchar para empezar.', error: '' };
 export class BookPlayer {
   state = { ...initialPlayer };
   private segments: SpeechSegment[] = [];
@@ -52,7 +53,7 @@ export class BookPlayer {
       if (!this.state.wanted) return;
       if (this.cursor + 1 >= this.segments.length) { this.completed = true; this.patch({ wanted: false, playing: false, status: 'Lectura terminada.' }); void this.persist(); return; }
       this.cursor++; this.savedTime = 0; this.loaded = -1;
-      this.patchCursor(); void this.persist(); this.present(); this.pump();
+      this.patchCursor(); void this.persist(); this.present(); void this.loadNearby(); this.pump();
     });
     on('error', () => this.fail(new Error('No se pudo reproducir el audio local.')));
     this.timer = setInterval(() => { if (this.state.wanted || this.state.playing) { void this.persist(); this.pump(); } }, 1000);
@@ -83,7 +84,7 @@ export class BookPlayer {
     this.completed = position?.completed ?? false;
     const segment = this.segments[this.cursor];
     this.savedSignature = position && segment ? JSON.stringify([this.bookId,segment.block,segment.part,this.savedTime,this.speed,this.voice,this.engine,this.completed]) : '';
-    this.patch({ ...initialPlayer, status: position ? 'Posición recuperada. Pulsá Escuchar para continuar.' : initialPlayer.status }); this.patchCursor();
+    this.patch({ ...initialPlayer, totalSegments: this.segments.length, status: position ? 'Posición recuperada. Pulsá Escuchar para continuar.' : initialPlayer.status }); this.patchCursor();
     if (!this.segments.length) this.patch({status:'No hay texto habilitado para escuchar. Revisá las secciones opcionales o si el PDF requiere OCR.'});
   }
   setRate(rate: number) { this.speed = rate; this.audio.playbackRate = rate; this.patch({reserveSeconds:this.reserve()/rate}); void this.persist(); if (this.automatic) this.pump(); }
@@ -93,20 +94,19 @@ export class BookPlayer {
     return true;
   }
   async select(block: number, autoplay = this.state.wanted) {
-    const fillToEnd = this.fillToEnd;
     const cursor = this.segments.findIndex(s => s.block >= block);
     if (cursor < 0) return;
     void this.persist(); this.stop(); this.cursor = cursor; this.savedTime = 0; this.completed = false; this.patchCursor();
     this.patch({ status: 'Párrafo seleccionado.', error: '', firstAudioMs: undefined }); await this.persist();
-    if (fillToEnd) this.prepareAll();
-    if (autoplay) this.start(); else if (!fillToEnd) this.prepareAhead();
+    this.prepareAll();
+    if (autoplay) this.start();
   }
   start() {
     if (!this.segments.length) return;
     if (this.completed) { this.stop(); this.completed = false; this.cursor = 0; this.savedTime = 0; this.patchCursor(); }
-    this.automatic = true; this.ahead = Infinity; this.startTime = performance.now(); this.patch({ wanted: true, error: '', status: 'Acumulando reserva para escuchar…' });
+    this.automatic = false; this.fillToEnd = true; this.ahead = Infinity; this.startTime = performance.now(); this.patch({ wanted: true, error: '', status: 'Acumulando reserva para escuchar…' });
     this.primeAudio();
-    this.present(); this.pump();
+    this.present(); void this.loadNearby(); this.pump();
   }
   // iOS requires play() on this element during the user's tap. Dora may need
   // minutes to generate the first clip, so keep the same element active.
@@ -134,7 +134,7 @@ export class BookPlayer {
     this.automatic = false; this.ahead = ahead; this.startTime = performance.now(); this.patch({ error: '' }); this.present(); this.pump();
   }
   prepareAhead() { if (!this.segments.length) return; this.automatic = true; this.fillToEnd = false; this.ahead = Infinity; this.startTime = performance.now(); this.patch({ error: '', status: 'Dora prepara una reserva de audio…' }); this.present(); this.pump(); }
-  prepareAll() { if (!this.segments.length) return; this.automatic = false; this.fillToEnd = true; this.ahead = Infinity; this.startTime = performance.now(); this.patch({ error: '', status: 'Dora prepara el libro completo en segundo plano…' }); this.present(); this.pump(); }
+  prepareAll() { if (!this.segments.length) return; this.automatic = false; this.fillToEnd = true; this.ahead = Infinity; this.startTime = performance.now(); this.patch({ error: '', status: 'Dora prepara el libro completo en segundo plano…' }); this.present(); void this.loadNearby(); this.pump(); }
   private reserve() { let seconds = 0; for (let i = this.cursor; this.prepared.has(i); i++) seconds += this.prepared.get(i)!.duration; return Math.max(0,seconds-this.savedTime); }
   cancel(release = false) { void this.persist(); this.stop(); if (release) this.provider.dispose(); this.patch({ status: 'Preparación cancelada.' }); }
   private stop() {
@@ -148,6 +148,24 @@ export class BookPlayer {
   currentBlob() { return this.ready.get(this.cursor)?.wav; }
   suspendForImport() { this.stop(); }
   clearError() { this.patch({ error: '' }); }
+  // Reading cached audio must not wait for the synthesis queue: a distant
+  // paragraph can take minutes while the next playable WAV is already on disk.
+  private async loadNearby() {
+    const epoch = this.epoch;
+    const from = this.cursor;
+    try {
+      for (let index = from; index < Math.min(from+4,this.segments.length); index++) {
+        if (this.ready.has(index)) continue;
+        const key = await audioKey(this.segments[index].text,this.voice,navigator.onLine === false ? 'wasm' : this.engine);
+        const record = await db.audio.get(key);
+        if (epoch !== this.epoch) return;
+        if (record && index >= this.cursor && index <= this.cursor+3) {
+          this.prepared.set(index,{duration:record.duration}); this.ready.set(index,record);
+          this.present(); this.patch({preparedCount:this.prepared.size,reserveSeconds:this.reserve()/this.speed});
+        }
+      }
+    } catch (error) { if (epoch === this.epoch) this.patch({error:`No se pudo recuperar el audio guardado: ${String(error)}`}); }
+  }
   private present() {
     const record = this.ready.get(this.cursor);
     if (!record) { this.buffering = true; if (this.state.wanted) this.patch({ status: 'Acumulando reserva de audio para continuar…', ready: false }); return; }
@@ -181,7 +199,11 @@ export class BookPlayer {
           if (this.ready.has(this.cursor) && this.automatic && !this.fillToEnd && this.reserve()/this.speed >= this.policy.targetSeconds) break;
           let target = this.cursor;
           while (target <= Math.min(this.cursor+this.ahead,this.segments.length-1) && this.prepared.has(target) && (target > this.cursor+3 || this.ready.has(target))) target++;
-          if (target > Math.min(this.cursor+this.ahead,this.segments.length-1)) break;
+          if (target > Math.min(this.cursor+this.ahead,this.segments.length-1)) {
+            // A jump prioritizes the new reading point, then fills missing earlier audio.
+            target = this.fillToEnd ? this.segments.findIndex((_,index) => !this.prepared.has(index)) : -1;
+            if (target < 0) break;
+          }
           const segment = this.segments[target];
           const key = await audioKey(segment.text,this.voice,navigator.onLine === false ? 'wasm' : this.engine);
           let cached = await db.audio.get(key);
@@ -218,8 +240,8 @@ export class BookPlayer {
             await db.audio.update(key,{ touchedAt: Date.now() });
           }
           if (epoch !== this.epoch) return;
-          for (const index of this.ready.keys()) if (index > this.cursor+3) this.ready.delete(index);
-          this.patch({ buffered: [...this.prepared.keys()].filter(key => key > this.cursor).length, reserveSeconds: this.reserve()/this.speed });
+          for (const index of this.ready.keys()) if (index < this.cursor || index > this.cursor+3) this.ready.delete(index);
+          this.patch({ preparedCount: this.prepared.size, buffered: [...this.prepared.keys()].filter(key => key > this.cursor).length, reserveSeconds: this.reserve()/this.speed });
         }
       } catch (error) { if (epoch === this.epoch) this.fail(error); }
       finally { if (epoch === this.epoch) { this.running = false; this.patch({ busy: false }); } }
