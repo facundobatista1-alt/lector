@@ -19,13 +19,13 @@ self.addEventListener('fetch', event => {
   const path = new URL(request.url).pathname;
   if (request.mode === 'navigate') {
     event.respondWith((async () => {
-      try { return await fetch(request); }
-      catch { return (await caches.open(SHELL)).match('/index.html') || Response.error(); }
+      try { const response = await fetch(request); if (response.ok) return response; } catch { /* Offline shell below. */ }
+      return (await (await caches.open(SHELL)).match('/index.html')) || Response.error();
     })());
     return;
   }
   if (paths.has(path)) {
-    event.respondWith((async () => (await caches.open(SHELL)).match(path) || fetch(request))());
+    event.respondWith((async () => (await (await caches.open(SHELL)).match(path)) || fetch(request))());
     return;
   }
   if (path.startsWith('/runtime/') || path.startsWith('/models/kokoro/')) {

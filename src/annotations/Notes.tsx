@@ -22,7 +22,7 @@ function QuoteCard({ quote, report }: { quote: Annotation; report: (text: string
   }
   async function remove() {
     if (!window.confirm('¿Eliminar esta cita?')) return;
-    try { await db.annotations.delete(quote.id); report('Cita eliminada.'); } catch { report('No se pudo eliminar la cita.'); }
+    try { const now = Date.now(); await db.annotations.update(quote.id, { deletedAt: now, updatedAt: now }); report('Cita eliminada.'); } catch { report('No se pudo eliminar la cita.'); }
   }
   return <article className="quote-card" style={{ borderLeftColor: quote.color }}>
     <h2>{quote.title}</h2><p className="quote-meta">{quoteReference(quote)}{quote.chapter ? ` · ${quote.chapter}` : ''}</p>
@@ -43,9 +43,10 @@ export function Notes() {
   const [status, setStatus] = useState('');
   useEffect(() => { const subscription = liveQuery(() => db.annotations.orderBy('createdAt').reverse().toArray()).subscribe({ next: setQuotes, error: () => setStatus('No se pudieron cargar las citas.') }); return () => subscription.unsubscribe(); }, []);
   const fold = (value: string) => value.normalize('NFD').replace(/\p{M}/gu, '').toLocaleLowerCase('es');
-  const filtered = quotes.filter(q => fold([q.text, q.title, q.author, q.comment].join(' ')).includes(fold(search)));
+  const visible = quotes.filter(q => !q.deletedAt);
+  const filtered = visible.filter(q => fold([q.text, q.title, q.author, q.comment].join(' ')).includes(fold(search)));
   return <section className="notes"><label>Buscar citas<input type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Texto, libro, autor o comentario"/></label>
     <p role="status">{status}</p>{filtered.map(quote => <QuoteCard key={quote.id} quote={quote} report={setStatus}/>)}
-    {!filtered.length && <p className="empty">{quotes.length ? 'No hay citas que coincidan con la búsqueda.' : 'Todavía no guardaste citas. Abrí un libro y pulsá «Guardar cita» mientras leés o escuchás.'}</p>}
+    {!filtered.length && <p className="empty">{visible.length ? 'No hay citas que coincidan con la búsqueda.' : 'Todavía no guardaste citas. Abrí un libro y pulsá «Guardar cita» mientras leés o escuchás.'}</p>}
   </section>;
 }

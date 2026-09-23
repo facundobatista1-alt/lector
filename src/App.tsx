@@ -13,6 +13,7 @@ import { BookPlayer, initialPlayer } from './audio/player';
 import { importPDF, upgradeBook } from './pdf/extract';
 import { syncNow } from './sync/supabase';
 import { SyncPanel } from './sync/SyncPanel';
+import { UpdateButton } from './pwa/UpdateButton';
 import type { Block, Book, Engine, Voice, Position, Chapter } from './types';
 
 const demo: Block[] = SAMPLE.map((text, i) => ({ id: `demo-${i}`, text, page: 1, pageLabel: 'muestra', endPage: 1 }));
@@ -46,6 +47,7 @@ export default function App() {
   const audio = useRef<HTMLAudioElement>(null);
   const player = useRef<BookPlayer | null>(null);
   const transferring = useRef(false);
+  useEffect(() => { const subscription = liveQuery(() => db.books.orderBy('importedAt').reverse().toArray()).subscribe({ next: setBooks, error: e => setError(message(e)) }); return () => subscription.unsubscribe(); }, []);
   useEffect(() => { const subscription = liveQuery(() => db.settings.get('ui')).subscribe({next:s=>{if(s){setDark(s.dark);setFollow(s.follow);setFontSize(s.fontSize);}},error:e=>setError(message(e))}); return ()=>subscription.unsubscribe(); }, []);
   function savePreferences(patch: Partial<{dark:boolean;follow:boolean;fontSize:number}>) {
     if(patch.dark!==undefined)setDark(patch.dark);
@@ -69,6 +71,13 @@ export default function App() {
   const seconds = state.seconds;
   const duration = state.duration;
   useEffect(() => {
+    if (!book || importing) return;
+    const saved = positions.find(p => p.bookId === book.id);
+    if (saved && player.current?.restoreRemote(book.id,audioBlocks(book),saved)) {
+      setRate(saved.rate); setEngine(saved.engine ?? 'wasm');
+    }
+  }, [book,positions,importing,state.busy,state.wanted]);
+  useEffect(() => {
     const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
     const instance = new BookPlayer(audio.current!, new LocalTTSProvider(), next => { setState(next); setIndex(next.block); }, () => {}, mobile ? { startSeconds: 0, targetSeconds: 45 } : undefined);
     player.current = instance;
@@ -84,6 +93,7 @@ export default function App() {
       const library = await db.books.orderBy('importedAt').reverse().toArray();
       if (!alive) return;
       setBooks(library);
+      setBook(savedBook);
 
       const v = 'ef_dora'; const e = saved?.engine ?? 'wasm'; const r = saved?.rate ?? 1;
       setVoice(v); setEngine(e); setRate(r);
@@ -183,11 +193,11 @@ export default function App() {
       <div className="sidebar-bottom"><span className="privacy-dot"/> Privado. Sin anuncios.<p>Dora · voz local</p><button className="text-button" onClick={() => savePreferences({dark:!dark})}>{dark ? '☀ Tema claro' : '☾ Tema oscuro'}</button></div>
     </aside>
     <main>
-      <header className="topbar"><span>LECTURA CON TIEMPO</span><span className="pill">● Todo queda en tu dispositivo</span></header>
+      <header className="topbar"><span>LECTURA CON TIEMPO</span><UpdateButton beforeReload={async () => { player.current?.pause(); await player.current?.persist(); }}/></header>
       <div className="page">
         <div className="eyebrow">{tab === 'notes' ? 'IDEAS QUE QUERÉS CONSERVAR' : tab === 'lab' ? 'TU LIBRO, SIN APURO' : tab === 'library' ? 'TUS LIBROS, A TU RITMO' : 'EVIDENCIA ANTES DE AVANZAR'}</div>
         <h1>{tab === 'notes' ? 'Citas y notas' : tab === 'lab' ? 'Leer y escuchar' : tab === 'library' ? 'Mi biblioteca' : 'Resultados del laboratorio'}</h1>
-        <p className="lead">{tab === 'notes' ? 'Fragmentos para volver a pensar. Guardados solamente en este navegador.' : tab === 'lab' ? 'Dora prepara tu libro mientras leés. Escuchá cuando tengas audio adelantado.' : tab === 'library' ? 'Importá un PDF para explorar su texto. El archivo permanece en este navegador.' : 'Mediciones de síntesis real guardadas en este dispositivo.'}</p>
+        <p className="lead">{tab === 'notes' ? 'Fragmentos para volver a pensar. Guardados en tu dispositivo y sincronizados si conectaste tu cuenta.' : tab === 'lab' ? 'Dora prepara tu libro mientras leés. Escuchá cuando tengas audio adelantado.' : tab === 'library' ? 'Importá un PDF para explorar su texto. Lectura local, con sincronización opcional entre dispositivos.' : 'Mediciones de síntesis real guardadas en este dispositivo.'}</p>
         {tab === 'notes' && <Notes/>}
         {(error || state.error) && <div className="error" role="alert">{error || state.error}<button onClick={() => void navigator.clipboard.writeText(error || state.error).then(() => setStatus('Error copiado.')).catch(() => setStatus('No se pudo copiar el error.'))}>Copiar error</button><button onClick={() => { setError(''); player.current?.clearError(); }} aria-label="Cerrar error">×</button></div>}
         {tab === 'lab' && <>
@@ -198,7 +208,7 @@ export default function App() {
             <p className="download-note">Dora prepara el libro completo en segundo plano. Podés escuchar los fragmentos listos mientras continúa la generación.</p>
           </section></details>
           <div className="status" role="status"><span className={busy ? 'working' : 'privacy-dot'}/>{status || state.status} · Reserva: {Math.floor(state.reserveSeconds / 60)} min {Math.floor(state.reserveSeconds % 60)} s{busy && <span className="elapsed"> · {elapsed} s transcurridos</span>}</div>
-          {!!chapters.length && <div className="chapter-controls"><button disabled={importing || calibrating || chapterIndex <= 0} onClick={() => void selectChapter(chapters[chapterIndex-1]).catch(e => setError(message(e)))}>�? � Capítulo anterior</button><span>{(browsedChapter ?? currentChapter)?.title}</span><button disabled={importing || calibrating || chapterIndex < 0 || chapterIndex >= chapters.length-1} onClick={() => void selectChapter(chapters[chapterIndex+1]).catch(e => setError(message(e)))}>Capítulo siguiente �? �</button></div>}
+          {!!chapters.length && <div className="chapter-controls"><button disabled={importing || calibrating || chapterIndex <= 0} onClick={() => void selectChapter(chapters[chapterIndex-1]).catch(e => setError(message(e)))}>← Capítulo anterior</button><span>{(browsedChapter ?? currentChapter)?.title}</span><button disabled={importing || calibrating || chapterIndex < 0 || chapterIndex >= chapters.length-1} onClick={() => void selectChapter(chapters[chapterIndex+1]).catch(e => setError(message(e)))}>Capítulo siguiente →</button></div>}
           <div className="reading-layout">
             <section className="paper" aria-label="Texto del libro">
               <div className="paper-header"><span>{book ? 'PDF IMPORTADO' : 'CINCO PÁRRAFOS · TEXTO ORIGINAL DE PRUEBA'}</span><span>{book ? `${book.pages} páginas` : 'Español'}</span></div>
@@ -208,7 +218,7 @@ export default function App() {
               {chapters.some(c => c.kind !== 'content') && <label className="supplement-setting"><input type="checkbox" checked={book?.includeSupplement ?? false} disabled={importing || calibrating} onChange={e => void includeSupplement(e.target.checked).catch(e => setError(message(e)))}/> Incluir índice y bibliografía en el audio</label>}
               <div className="reading-tools"><label><input type="checkbox" checked={follow} onChange={e => savePreferences({follow:e.target.checked})}/> Seguir párrafo</label><label>Tamaño <input aria-label="Tamaño del texto" type="range" min="17" max="30" value={fontSize} onChange={e => savePreferences({fontSize:Number(e.target.value)})}/></label></div>
               <div className="paragraphs" style={{ fontSize }}>
-                {blocks.map((block, i) => <button id={`block-${i}`} key={block.id} className={`paragraph ${block.kind === 'noise' ? 'noise' : ''} ${i === index ? 'active' : ''} ${playing && i === index ? 'speaking' : ''}`} disabled={calibrating} onClick={() => void choose(i).catch(e => setError(message(e)))} aria-label={`Seleccionar párrafo ${i + 1}`} aria-current={i === index ? 'true' : undefined}><span className="paragraph-number">{String(i + 1).padStart(2, '0')}</span><span>{block.text}{block.kind === 'noise' && <small className="omitted-label">Encabezado o numeración · no se lee</small>}{block.kind === 'supplement' && !book?.includeSupplement && <small className="omitted-label">Sección opcional · no se lee</small>}{book && <small className="page-reference">Página {block.pageLabel} · archivo {block.page}{block.endPage !== block.page ? `–${block.endPage}` : ''}</small>}</span></button>)}
+                {blocks.map((block, i) => <button id={`block-${i}`} key={block.id} className={`paragraph ${block.kind === 'noise' ? 'noise' : ''} ${i === index ? 'active' : ''} ${playing && i === index ? 'speaking' : ''}`} disabled={calibrating || importing} onClick={() => void choose(i).catch(e => setError(message(e)))} aria-label={`Seleccionar párrafo ${i + 1}`} aria-current={i === index ? 'true' : undefined}><span className="paragraph-number">{String(i + 1).padStart(2, '0')}</span><span>{block.text}{block.kind === 'noise' && <small className="omitted-label">Encabezado o numeración · no se lee</small>}{block.kind === 'supplement' && !book?.includeSupplement && <small className="omitted-label">Sección opcional · no se lee</small>}{book && <small className="page-reference">Página {block.pageLabel} · archivo {block.page}{block.endPage !== block.page ? `–${block.endPage}` : ''}</small>}</span></button>)}
                 {!blocks.length && <p>No se encontró texto legible. Este PDF requiere OCR.</p>}
               </div>
               <div className="paper-footer">{playing ? 'Leyendo' : 'Seleccionado'} · párrafo {blocks.length ? index + 1 : 0} de {blocks.length}<span>Sincronización por párrafo</span></div>
@@ -217,10 +227,10 @@ export default function App() {
             </aside>
           </div>
         </>}
-        {tab === 'library' && <><OfflinePanel bookId={book?.id} title={book?.title}/><SyncPanel onChange={() => { void syncNow().then(() => setSyncMessage('Sincronización actualizada.')).catch(e => setSyncMessage(message(e))); }}/><Library books={books} positions={positions} disabled={calibrating} importing={importing} onOpen={item => void openBook(item).catch(e => setError(message(e)))} onResume={item => void openBook(item,true).catch(e => setError(message(e)))} onUpload={file => void upload(file)}/><div className="status" role="status">{syncMessage || status || (book ? state.status : 'Tus libros quedan guardados en este navegador.')}</div></>}
+        {tab === 'library' && <><OfflinePanel bookId={book?.id} title={book?.title}/><SyncPanel onChange={() => setSyncMessage("Datos sincronizados.")}/><Library books={books} positions={positions} disabled={calibrating} importing={importing} onOpen={item => void openBook(item).catch(e => setError(message(e)))} onResume={item => void openBook(item,true).catch(e => setError(message(e)))} onUpload={file => void upload(file)}/><div className="status" role="status">{syncMessage || status || (book ? state.status : 'Tus libros quedan guardados en este navegador.')}</div></>}
       </div>
     </main>
-    <footer className="player" aria-label="Reproductor de prueba"><div className="now-playing"><span className="mini-cover">l.</span><div><strong>{book?.title ?? 'Sobre la libertad y la lectura'}</strong><small>{currentChapter?.title ?? 'Párrafo '+(index+1)} · {voice.replace('ef_', '').replace('em_', '')} · {state.wanted && !playing ? 'Preparando audio…' : `Fragmento ${state.part+1}`}</small></div></div><div className="transport"><button aria-label="Párrafo anterior" disabled={calibrating || importing || index === 0} onClick={() => void choose(index - 1).catch(e => setError(message(e)))}>│◀</button><button className="play" disabled={calibrating || importing || !blocks.length} onClick={toggle} aria-label={state.wanted ? 'Pausar' : 'Escuchar'}>{state.wanted ? 'Ⅱ' : '▶'}</button><button aria-label="Párrafo siguiente" disabled={calibrating || importing || index >= blocks.length - 1} onClick={() => void choose(index + 1).catch(e => setError(message(e)))}>▶│</button><span className="time">{Math.floor(seconds)} / {Math.floor(duration)} s</span></div><label className="speed">Velocidad<select aria-label="Velocidad" value={rate} onChange={e => { const next = Number(e.target.value); setRate(next); player.current?.setRate(next); }}>{rates.map(r => <option key={r} value={r}>{r}×</option>)}</select></label><button className="save-quote" disabled={!book || importing || savingQuote || !blocks[state.block]?.text.trim()} onClick={() => void saveQuote()}>Guardar cita</button></footer>
+    <footer className="player" aria-label="Reproductor"><div className="now-playing"><span className="mini-cover">l.</span><div><strong>{book?.title ?? 'Sobre la libertad y la lectura'}</strong><small>{currentChapter?.title ?? 'Párrafo '+(index+1)} · {voice.replace('ef_', '').replace('em_', '')} · {state.wanted && !playing ? 'Preparando audio…' : `Fragmento ${state.part+1}`}</small></div></div><div className="transport"><button aria-label="Párrafo anterior" disabled={calibrating || importing || index === 0} onClick={() => void choose(index - 1).catch(e => setError(message(e)))}>│◀</button><button className="play" disabled={calibrating || importing || !blocks.length} onClick={toggle} aria-label={state.wanted ? 'Pausar' : 'Escuchar'}>{state.wanted ? 'Ⅱ' : '▶'}</button><button aria-label="Párrafo siguiente" disabled={calibrating || importing || index >= blocks.length - 1} onClick={() => void choose(index + 1).catch(e => setError(message(e)))}>▶│</button><span className="time">{Math.floor(seconds)} / {Math.floor(duration)} s</span></div><label className="speed">Velocidad<select aria-label="Velocidad" value={rate} onChange={e => { const next = Number(e.target.value); setRate(next); player.current?.setRate(next); }}>{rates.map(r => <option key={r} value={r}>{r}×</option>)}</select></label><button className="save-quote" disabled={!book || importing || savingQuote || !blocks[state.block]?.text.trim()} onClick={() => void saveQuote()}>Guardar cita</button></footer>
     <audio ref={audio} preload="auto"/>
     {quoteFeedback && <div className="quote-feedback" role="status">{quoteFeedback}</div>}
   </div>;

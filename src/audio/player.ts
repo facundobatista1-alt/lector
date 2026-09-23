@@ -17,6 +17,7 @@ export class BookPlayer {
   private running = false;
   private loaded = -1;
   private ready = new Map<number, AudioRecord>();
+  private prepared = new Map<number, { duration: number }>();
   private url = '';
   private primeUrl = '';
   private priming = false;
@@ -32,6 +33,8 @@ export class BookPlayer {
   private savedTime = 0;
   private completed = false;
   private lastSavedAt = 0;
+  private savedSignature = '';
+  private pendingSave: Promise<void> = Promise.resolve();
   private timer: ReturnType<typeof setInterval>;
   private listeners: Array<[string, EventListener]> = [];
   constructor(private audio: HTMLAudioElement, private provider: TTSProvider, private change: (state: PlayerState) => void, private measured: () => void, private policy = { startSeconds: 30, targetSeconds: 300 }) {
@@ -62,9 +65,13 @@ export class BookPlayer {
   async persist() {
     if (!this.segments[this.cursor]) return;
     const segment = this.segments[this.cursor];
+    const signature = JSON.stringify([this.bookId,segment.block,segment.part,this.savedTime,this.speed,this.voice,this.engine,this.completed]);
+    if (signature === this.savedSignature) { await this.pendingSave; return; }
+    this.savedSignature = signature;
     this.lastSavedAt = Math.max(Date.now(),this.lastSavedAt+1);
     const position: Position = { bookId: this.bookId, block: segment.block, segment: segment.part, textOffset: segment.offset, seconds: this.savedTime, rate: this.speed, voice: this.voice, engine: this.engine, completed:this.completed, updatedAt: this.lastSavedAt };
-    try { await savePosition(position); } catch (error) { this.patch({ error: `No se pudo guardar la posición: ${String(error)}` }); }
+    this.pendingSave = savePosition(position).catch(error => { this.savedSignature = ''; this.patch({ error: `No se pudo guardar la posición: ${String(error)}` }); });
+    await this.pendingSave;
   }
   configure(bookId: string, blocks: Block[], voice: Voice, engine: Engine, rate: number, position?: Position) {
     this.stop(); this.bookId = bookId; this.voice = voice; this.engine = engine; this.speed = rate;
@@ -74,16 +81,25 @@ export class BookPlayer {
     const next = this.segments.findIndex(s => s.block >= (position?.block ?? 0));
     this.cursor = found >= 0 ? found : Math.max(0,next); this.savedTime = found < 0 || position?.segment === undefined ? 0 : position.seconds;
     this.completed = position?.completed ?? false;
+    const segment = this.segments[this.cursor];
+    this.savedSignature = position && segment ? JSON.stringify([this.bookId,segment.block,segment.part,this.savedTime,this.speed,this.voice,this.engine,this.completed]) : '';
     this.patch({ ...initialPlayer, status: position ? 'Posición recuperada. Pulsá Escuchar para continuar.' : initialPlayer.status }); this.patchCursor();
     if (!this.segments.length) this.patch({status:'No hay texto habilitado para escuchar. Revisá las secciones opcionales o si el PDF requiere OCR.'});
   }
   setRate(rate: number) { this.speed = rate; this.audio.playbackRate = rate; this.patch({reserveSeconds:this.reserve()/rate}); void this.persist(); if (this.automatic) this.pump(); }
+  restoreRemote(bookId: string, blocks: Block[], position: Position) {
+    if (bookId !== this.bookId || this.state.wanted || this.state.busy || position.updatedAt <= this.lastSavedAt) return false;
+    this.configure(bookId,blocks,'ef_dora',position.engine ?? this.engine,position.rate,position);
+    return true;
+  }
   async select(block: number, autoplay = this.state.wanted) {
+    const fillToEnd = this.fillToEnd;
     const cursor = this.segments.findIndex(s => s.block >= block);
     if (cursor < 0) return;
     void this.persist(); this.stop(); this.cursor = cursor; this.savedTime = 0; this.completed = false; this.patchCursor();
     this.patch({ status: 'Párrafo seleccionado.', error: '', firstAudioMs: undefined }); await this.persist();
-    if (autoplay) this.start(); else this.prepareAhead();
+    if (fillToEnd) this.prepareAll();
+    if (autoplay) this.start(); else if (!fillToEnd) this.prepareAhead();
   }
   start() {
     if (!this.segments.length) return;
@@ -119,7 +135,7 @@ export class BookPlayer {
   }
   prepareAhead() { if (!this.segments.length) return; this.automatic = true; this.fillToEnd = false; this.ahead = Infinity; this.startTime = performance.now(); this.patch({ error: '', status: 'Dora prepara una reserva de audio…' }); this.present(); this.pump(); }
   prepareAll() { if (!this.segments.length) return; this.automatic = false; this.fillToEnd = true; this.ahead = Infinity; this.startTime = performance.now(); this.patch({ error: '', status: 'Dora prepara el libro completo en segundo plano…' }); this.present(); this.pump(); }
-  private reserve() { let seconds = 0; for (let i = this.cursor; this.ready.has(i); i++) seconds += this.ready.get(i)!.duration; return Math.max(0,seconds-this.savedTime); }
+  private reserve() { let seconds = 0; for (let i = this.cursor; this.prepared.has(i); i++) seconds += this.prepared.get(i)!.duration; return Math.max(0,seconds-this.savedTime); }
   cancel(release = false) { void this.persist(); this.stop(); if (release) this.provider.dispose(); this.patch({ status: 'Preparación cancelada.' }); }
   private stop() {
     this.epoch++; if (this.running) this.provider.dispose(); this.running = false; this.audio.pause();
@@ -127,7 +143,7 @@ export class BookPlayer {
     if (this.url) URL.revokeObjectURL(this.url); this.url = '';
     if (this.primeUrl) URL.revokeObjectURL(this.primeUrl); this.primeUrl = '';
     this.priming = false; this.audio.loop = false;
-    this.ready.clear(); this.loaded = -1; this.buffering = true; this.automatic = false; this.fillToEnd = false; this.patch({ wanted: false, busy: false, playing: false, ready: false, buffered: 0, reserveSeconds: 0 });
+    this.ready.clear(); this.prepared.clear(); this.loaded = -1; this.buffering = true; this.automatic = false; this.fillToEnd = false; this.patch({ wanted: false, busy: false, playing: false, ready: false, buffered: 0, reserveSeconds: 0 });
   }
   currentBlob() { return this.ready.get(this.cursor)?.wav; }
   suspendForImport() { this.stop(); }
@@ -147,7 +163,7 @@ export class BookPlayer {
   }
   private playLoaded() {
     if (this.buffering && this.reserve()/this.speed < this.policy.startSeconds) {
-      let end = this.cursor; while (this.ready.has(end)) end++;
+      let end = this.cursor; while (this.prepared.has(end)) end++;
       if (end < this.segments.length) { this.patch({ status: `Preparando reserva: ${Math.floor(this.reserve()/this.speed)} de ${this.policy.startSeconds} segundos. Empezará automáticamente.` }); return; }
     }
     this.buffering = false;
@@ -162,9 +178,9 @@ export class BookPlayer {
       try {
         while (epoch === this.epoch) {
           for (const key of this.ready.keys()) if (key < this.cursor || key > this.cursor+this.ahead) this.ready.delete(key);
-          if (this.automatic && !this.fillToEnd && this.reserve()/this.speed >= this.policy.targetSeconds) break;
+          if (this.ready.has(this.cursor) && this.automatic && !this.fillToEnd && this.reserve()/this.speed >= this.policy.targetSeconds) break;
           let target = this.cursor;
-          while (target <= Math.min(this.cursor+this.ahead,this.segments.length-1) && this.ready.has(target)) target++;
+          while (target <= Math.min(this.cursor+this.ahead,this.segments.length-1) && this.prepared.has(target) && (target > this.cursor+3 || this.ready.has(target))) target++;
           if (target > Math.min(this.cursor+this.ahead,this.segments.length-1)) break;
           const segment = this.segments[target];
           const key = await audioKey(segment.text,this.voice,navigator.onLine === false ? 'wasm' : this.engine);
@@ -190,17 +206,20 @@ export class BookPlayer {
             const wav = encodeWav(result.samples,result.sampleRate);
             cached = { key, wav, bytes: wav.size, duration: result.samples.length/result.sampleRate, touchedAt: Date.now() };
             // Playback does not depend on a successful cache write (e.g. full disk).
+            this.prepared.set(target,{ duration: cached.duration });
             this.ready.set(target,cached); this.present();
             try {
-              await db.audio.put(cached); await trimAudio(db,500*1024*1024);
+              await db.audio.put(cached); if (!this.fillToEnd) await trimAudio(db,500*1024*1024);
               await db.measurements.add({ ...result.measurement, createdAt: Date.now(), userAgent: navigator.userAgent }); this.measured();
-            } catch (error) { if (epoch === this.epoch) this.patch({ error: `Audio disponible, pero no se pudo guardar el cache: ${String(error)}` }); }
+            } catch (error) { if (epoch === this.epoch) this.patch({ error: `No se pudo guardar más audio. Liberá espacio y reanudá la preparación: ${String(error)}` }); if (this.fillToEnd) break; }
           } else {
+            this.prepared.set(target,{ duration: cached.duration });
             this.ready.set(target,cached); this.present();
             await db.audio.update(key,{ touchedAt: Date.now() });
           }
           if (epoch !== this.epoch) return;
-          this.patch({ buffered: [...this.ready.keys()].filter(key => key > this.cursor).length, reserveSeconds: this.reserve()/this.speed });
+          for (const index of this.ready.keys()) if (index > this.cursor+3) this.ready.delete(index);
+          this.patch({ buffered: [...this.prepared.keys()].filter(key => key > this.cursor).length, reserveSeconds: this.reserve()/this.speed });
         }
       } catch (error) { if (epoch === this.epoch) this.fail(error); }
       finally { if (epoch === this.epoch) { this.running = false; this.patch({ busy: false }); } }

@@ -14,6 +14,32 @@ class AudioStub extends EventTarget {
 const sample: Synthesis = { samples: new Float32Array(120000),sampleRate:24000,measurement:{voice:'ef_dora',requested:'wasm',actual:'wasm',loadMs:0,generationMs:1,audioSeconds:5,rtf:.1,pcmBytes:480000} };
 const blocks = Array.from({length:8},(_,i) => ({id:String(i),text:`Párrafo ${i}.`,page:1,pageLabel:'1',endPage:1}));
 const players: BookPlayer[] = [];
+it('prepara todo aunque se pause y reutiliza el audio después de volver a abrir', async () => {
+  const provider = {synthesize:vi.fn().mockResolvedValue(sample),dispose:vi.fn()};
+  const player = new BookPlayer(new AudioStub() as unknown as HTMLAudioElement,provider,()=>{},()=>{},{startSeconds:0,targetSeconds:5}); players.push(player);
+  player.configure('whole-book',blocks,'ef_dora','wasm',1);
+  player.prepareAll(); player.start(); player.pause();
+  await vi.waitFor(() => expect(player.state.buffered).toBe(7));
+  expect(await db.audio.count()).toBe(8);
+  expect(provider.synthesize).toHaveBeenCalledTimes(8);
+  await player.select(5,false);
+  await vi.waitFor(() => expect(player.state.busy).toBe(false));
+  player.configure('whole-book',blocks,'ef_dora','wasm',1);
+  player.prepareAll();
+  await vi.waitFor(() => expect(player.state.buffered).toBe(7));
+  expect(provider.synthesize).toHaveBeenCalledTimes(8);
+});
+it('no renueva un avance sin cambios y restaura un avance remoto estando en pausa', async () => {
+  const provider = {synthesize:vi.fn().mockResolvedValue(sample),dispose:vi.fn()};
+  const player = new BookPlayer(new AudioStub() as unknown as HTMLAudioElement,provider,()=>{},()=>{}); players.push(player);
+  const saved = {bookId:'remote',block:0,segment:0,seconds:2,rate:1,voice:'ef_dora' as const,engine:'wasm' as const,updatedAt:100};
+  await db.positions.put(saved);
+  player.configure('remote',blocks,'ef_dora','wasm',1,saved);
+  await player.persist();
+  expect((await db.positions.get('remote'))?.updatedAt).toBe(100);
+  expect(player.restoreRemote('remote',blocks,{...saved,block:5,updatedAt:200})).toBe(true);
+  expect(player.state.block).toBe(5);
+});
 afterEach(async () => { players.splice(0).forEach(p => p.dispose()); await db.audio.clear(); await db.positions.clear(); await db.measurements.clear(); vi.unstubAllGlobals(); });
 it('activa el mismo elemento de audio durante el toque en iPhone y luego reproduce Dora', async () => {
   vi.stubGlobal('navigator',{userAgent:'iPhone',onLine:true});

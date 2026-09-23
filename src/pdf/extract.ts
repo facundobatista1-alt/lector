@@ -39,7 +39,7 @@ export async function importPDF(file: File, progress: (text: string) => void, fo
 }
 
 export async function upgradeBook(book: Book, progress: (text: string) => void): Promise<Book> {
-  if (!book.file.size) return book.structureVersion === STRUCTURE_VERSION ? book : structureBook(book);
+  if (!book.file.size) { if (book.structureVersion === STRUCTURE_VERSION) return book; const updated = structureBook(book); await db.books.put(updated); return updated; }
   if (book.extractionVersion !== EXTRACTION_VERSION) return importPDF(new File([book.file], `${book.title}.pdf`, { type: 'application/pdf' }),progress,true);
   if (book.structureVersion === STRUCTURE_VERSION) return book;
   progress('Preparando navegación por capítulos…');
