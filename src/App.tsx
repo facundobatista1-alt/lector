@@ -110,12 +110,12 @@ export default function App() {
   },[book,index,playing,currentChapter]);
   async function choose(i: number) { setBrowsedChapter(undefined); setStatus(''); await player.current?.select(i); }
   function cancel() { calibration.current?.abort(); player.current?.cancel(); }
-  function prepare(all = false) { setStatus(''); if (all) player.current?.prepareAhead(); else player.current?.prepare(); }
+  function prepare(all = false) { setStatus(''); if (all) player.current?.prepareAll(); else player.current?.prepare(); }
   async function openBook(next?: Book, autoplay = false) {
     if (next && book?.id === next.id) {
       setBook(next); setTab('lab'); setBrowsedChapter(undefined);
       if (autoplay) player.current?.start();
-      else if (!player.current?.state.ready && !player.current?.state.busy) player.current?.prepareAhead();
+      else if (!player.current?.state.ready && !player.current?.state.busy) player.current?.prepareAll();
       return;
     }
     await player.current?.persist(); player.current?.cancel(); setImporting(true);
@@ -129,7 +129,7 @@ export default function App() {
       player.current?.configure(upgraded?.id ?? 'demo',upgraded ? audioBlocks(upgraded) : demo,v,e,r,saved);
       setBooks(await db.books.orderBy('importedAt').reverse().toArray()); setStatus('');
       await player.current?.persist();
-      if (autoplay) player.current?.start(); else if (upgraded) player.current?.prepareAhead();
+      if (autoplay) player.current?.start(); else if (upgraded) player.current?.prepareAll();
     } finally { setImporting(false); }
   }
   async function upload(file?: File) {
@@ -154,7 +154,7 @@ export default function App() {
       setBooks(await db.books.orderBy('importedAt').reverse().toArray());
       player.current?.configure(updated.id,audioBlocks(updated),voice,engine,rate,saved ? {...saved,completed:false} : undefined);
       await player.current?.persist();
-      if (wanted) player.current?.start(); else player.current?.prepareAhead();
+      if (wanted) player.current?.start(); else player.current?.prepareAll();
     } catch (error) { setBook(book); throw error; }
     finally { setImporting(false); }
   }
@@ -194,8 +194,8 @@ export default function App() {
           <details className="voice-settings"><summary>Opciones de audio · Dora</summary><section className="lab-controls" aria-label="Configuración de voz">
             <div className="voice-label">VOZ EN ESPAÑOL<strong> · Dora</strong></div>
             <button className="primary" disabled={busy || calibrating || !blocks.length || importing} onClick={() => void prepare()}>{busy ? 'Preparando…' : '✦ Preparar fragmento'}</button>
-            {busy || calibrating ? <button onClick={cancel}>Cancelar</button> : <button disabled={!blocks.length || importing} onClick={() => void prepare(true)}>Preparar por adelantado</button>}
-            <p className="download-note">Dora prepara audio al abrir un PDF. En iPhone y Android, Play comienza apenas está listo el primer fragmento; en PC espera una reserva inicial de 30 segundos. La generación continúa mientras escuchás. Dejá la aplicación abierta para que avance.</p>
+            {busy || calibrating ? <button onClick={cancel}>Cancelar</button> : <button disabled={!blocks.length || importing} onClick={() => void prepare(true)}>Preparar libro completo</button>}
+            <p className="download-note">Dora prepara el libro completo en segundo plano. Podés escuchar los fragmentos listos mientras continúa la generación.</p>
           </section></details>
           <div className="status" role="status"><span className={busy ? 'working' : 'privacy-dot'}/>{status || state.status} · Reserva: {Math.floor(state.reserveSeconds / 60)} min {Math.floor(state.reserveSeconds % 60)} s{busy && <span className="elapsed"> · {elapsed} s transcurridos</span>}</div>
           {!!chapters.length && <div className="chapter-controls"><button disabled={importing || calibrating || chapterIndex <= 0} onClick={() => void selectChapter(chapters[chapterIndex-1]).catch(e => setError(message(e)))}>�? � Capítulo anterior</button><span>{(browsedChapter ?? currentChapter)?.title}</span><button disabled={importing || calibrating || chapterIndex < 0 || chapterIndex >= chapters.length-1} onClick={() => void selectChapter(chapters[chapterIndex+1]).catch(e => setError(message(e)))}>Capítulo siguiente �? �</button></div>}

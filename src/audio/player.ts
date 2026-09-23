@@ -27,6 +27,7 @@ export class BookPlayer {
   private ahead = 0;
   private automatic = false;
   private buffering = true;
+  private fillToEnd = false;
   private startTime = 0;
   private savedTime = 0;
   private completed = false;
@@ -116,7 +117,8 @@ export class BookPlayer {
     if (!this.segments.length) return;
     this.automatic = false; this.ahead = ahead; this.startTime = performance.now(); this.patch({ error: '' }); this.present(); this.pump();
   }
-  prepareAhead() { if (!this.segments.length) return; this.automatic = true; this.ahead = Infinity; this.startTime = performance.now(); this.patch({ error: '', status: 'Dora prepara hasta 5 minutos de audio por adelantado…' }); this.present(); this.pump(); }
+  prepareAhead() { if (!this.segments.length) return; this.automatic = true; this.fillToEnd = false; this.ahead = Infinity; this.startTime = performance.now(); this.patch({ error: '', status: 'Dora prepara una reserva de audio…' }); this.present(); this.pump(); }
+  prepareAll() { if (!this.segments.length) return; this.automatic = false; this.fillToEnd = true; this.ahead = Infinity; this.startTime = performance.now(); this.patch({ error: '', status: 'Dora prepara el libro completo en segundo plano…' }); this.present(); this.pump(); }
   private reserve() { let seconds = 0; for (let i = this.cursor; this.ready.has(i); i++) seconds += this.ready.get(i)!.duration; return Math.max(0,seconds-this.savedTime); }
   cancel(release = false) { void this.persist(); this.stop(); if (release) this.provider.dispose(); this.patch({ status: 'Preparación cancelada.' }); }
   private stop() {
@@ -125,7 +127,7 @@ export class BookPlayer {
     if (this.url) URL.revokeObjectURL(this.url); this.url = '';
     if (this.primeUrl) URL.revokeObjectURL(this.primeUrl); this.primeUrl = '';
     this.priming = false; this.audio.loop = false;
-    this.ready.clear(); this.loaded = -1; this.buffering = true; this.automatic = false; this.patch({ wanted: false, busy: false, playing: false, ready: false, buffered: 0, reserveSeconds: 0 });
+    this.ready.clear(); this.loaded = -1; this.buffering = true; this.automatic = false; this.fillToEnd = false; this.patch({ wanted: false, busy: false, playing: false, ready: false, buffered: 0, reserveSeconds: 0 });
   }
   currentBlob() { return this.ready.get(this.cursor)?.wav; }
   suspendForImport() { this.stop(); }
@@ -160,7 +162,7 @@ export class BookPlayer {
       try {
         while (epoch === this.epoch) {
           for (const key of this.ready.keys()) if (key < this.cursor || key > this.cursor+this.ahead) this.ready.delete(key);
-          if (this.automatic && this.reserve()/this.speed >= this.policy.targetSeconds) break;
+          if (this.automatic && !this.fillToEnd && this.reserve()/this.speed >= this.policy.targetSeconds) break;
           let target = this.cursor;
           while (target <= Math.min(this.cursor+this.ahead,this.segments.length-1) && this.ready.has(target)) target++;
           if (target > Math.min(this.cursor+this.ahead,this.segments.length-1)) break;
